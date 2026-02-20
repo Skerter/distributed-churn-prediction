@@ -4,5 +4,3 @@ print(f'Текущая версия Python: {sys.version}')
 print("All imports successful!")
 
 # TODO: Доделать вывод данных explore_dataset.ipynb
-# TODO: Дописать kagglehub в environment.yml
-# TODO: Проверять скачан ли датасет чтоб не перезагружать его, добавить обновление датасета и другие фичи
