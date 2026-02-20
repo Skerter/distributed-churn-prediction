@@ -13,7 +13,10 @@ coloredlogs.install(level='INFO', logger=logger, fmt='%(asctime)s [%(levelname)s
 data_dir = r'C:\vs_code_projects\distributed-churn-prediction\data'
 dataset = 'hamzaghanmi/expresso-churn-prediction-challenge'
 
-# Ключевые файлы для проверки (train и test — основные)
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
+
+# Ключевые файлы для проверки
 required_files = ['Train.csv', 'Test.csv', 'SampleSubmission.csv']
 
 try:
