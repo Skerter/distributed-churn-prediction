@@ -10,20 +10,21 @@ coloredlogs.install(level='INFO', logger=logger, fmt='%(asctime)s [%(levelname)s
                     level_styles={'info': {'color': 'green'}, 'error': {'color': 'red', 'bold': True}})
 
 # Определяем пути
-data_dir = r'C:\vs_code_projects\distributed-churn-prediction\data'
+DATA_DIR = 'C:/vs_code_projects/distributed-churn-prediction/data/'
 dataset = 'hamzaghanmi/expresso-churn-prediction-challenge'
 
-if not os.path.exists(data_dir):
-    os.makedirs(data_dir)
+if not os.path.exists(DATA_DIR):
+    logger.info(f'Создана папка {DATA_DIR}')
+    os.makedirs(DATA_DIR)
 
 # Ключевые файлы для проверки
 required_files = ['Train.csv', 'Test.csv', 'SampleSubmission.csv']
 
 try:
     # Проверяем, все ли требуемые файлы уже существуют
-    if all(os.path.exists(os.path.join(data_dir, file)) for file in required_files):
-        logger.info(f"Данные уже загружены в {data_dir}. Пропускаем загрузку.")
-        print(f"Данные уже доступны в {data_dir}")
+    if all(os.path.exists(os.path.join(DATA_DIR, file)) for file in required_files):
+        logger.info(f"Данные уже загружены в {DATA_DIR}. Пропускаем загрузку.")
+        print(f"Данные уже доступны в {DATA_DIR}")
     else:
         # Загружаем датасет (возвращает путь к директории с файлами)
         download_path = kagglehub.dataset_download(dataset)
@@ -34,22 +35,23 @@ try:
             raise ValueError(f"Ожидалась директория, но получен файл: {download_path}")
 
         # Создаём целевую папку, если не существует
-        os.makedirs(data_dir, exist_ok=True)
+        os.makedirs(DATA_DIR, exist_ok=True)
 
-        # Копируем только CSV-файлы в data_dir
+        # Копируем только CSV-файлы в DATA_DIR
         copied_files = []
         for file in os.listdir(download_path):
             if file.endswith('.csv'):
                 src = os.path.join(download_path, file)
-                dst = os.path.join(data_dir, file)
+                dst = os.path.join(DATA_DIR, file)
                 shutil.copy(src, dst)  # Копируем, чтобы сохранить кэш
                 copied_files.append(file)
         
         if not copied_files:
+            logger.error("Не найдены CSV-файлы в загруженном датасете.")
             raise FileNotFoundError("Не найдены CSV-файлы в загруженном датасете.")
         
-        logger.info(f"Скопированы файлы: {', '.join(copied_files)} в {data_dir}")
-        print(f"Датасет успешно скопирован в {data_dir}")
+        logger.info(f"Скопированы файлы: {', '.join(copied_files)} в {DATA_DIR}")
+        print(f"Датасет успешно скопирован в {DATA_DIR}")
 
 except Exception as e:
     logger.error(f"Ошибка при загрузке датасета: {str(e)}")
