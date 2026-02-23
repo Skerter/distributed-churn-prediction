@@ -15,4 +15,4 @@ Dask: Для распределённых DataFrame/Array и ML.
 Docker: Контейнеризация образов (Dask workers/scheduler с зависимостями).
 Kubernetes (minikube/kind локально + Dask Kubernetes Operator): Multi-node кластер (3–12 workers), autoscaling, dashboard для визуализации.
 
-Датасет: https://www.kaggle.com/datasets/hamzaghanmi/expresso-churn-prediction-challenge/data?select=Train.csv
+Датасет: https://www.kaggle.com/datasets/hamzaghanmi/expresso-churn-prediction-challenge
