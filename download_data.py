@@ -4,14 +4,12 @@ import shutil
 import logging
 import coloredlogs  # Для цветовой подсветки логов
 
+from config import DATA_DIR, DATASET_PATH_FROM_KAGGLE
+
 # Настраиваем логирование с цветами (не влияет на скорость, только визуал)
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='INFO', logger=logger, fmt='%(asctime)s [%(levelname)s] %(message)s', 
                     level_styles={'info': {'color': 'green'}, 'error': {'color': 'red', 'bold': True}})
-
-# Определяем пути
-DATA_DIR = 'C:/vs_code_projects/distributed-churn-prediction/data/'
-dataset = 'hamzaghanmi/expresso-churn-prediction-challenge'
 
 if not os.path.exists(DATA_DIR):
     logger.info(f'Создана папка {DATA_DIR}')
@@ -27,7 +25,7 @@ try:
         print(f"Данные уже доступны в {DATA_DIR}")
     else:
         # Загружаем датасет (возвращает путь к директории с файлами)
-        download_path = kagglehub.dataset_download(dataset)
+        download_path = kagglehub.DATASET_PATH_FROM_KAGGLE_download(DATASET_PATH_FROM_KAGGLE)
         logger.info(f"Путь к датасету: {download_path}")
 
         # Проверяем, является ли путь директорией

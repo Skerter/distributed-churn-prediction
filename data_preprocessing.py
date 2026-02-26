@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 import coloredlogs
 
+from config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 coloredlogs.install(level='INFO', logger=logger, fmt='%(asctime)s [%(levelname)s] %(message)s',
@@ -10,7 +11,7 @@ coloredlogs.install(level='INFO', logger=logger, fmt='%(asctime)s [%(levelname)s
 
 def read_data(train=True):
 
-    DATA_PATH = 'C:/vs_code_projects/distributed-churn-prediction/data/Train.csv'
+    DATA_PATH = DATA_DIR + 'Train.csv'
 
     all_cols = ['user_id', 'REGION', 'TENURE', 'MONTANT', 'FREQUENCE_RECH', 'REVENUE',
                 'ARPU_SEGMENT', 'FREQUENCE', 'DATA_VOLUME', 'ON_NET', 'ORANGE', 'TIGO',

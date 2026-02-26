@@ -1,8 +1,10 @@
 # project ignore
 data/
-data/*.csv
-data/*.parquet
-data/*.pkl
+bank-customer-classification/
+
+*.csv
+*.parquet
+*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
