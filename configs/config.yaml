@@ -1,0 +1,41 @@
+# ====================== ПУТИ ======================
+paths:
+  data_source: "data/source/"            # сюда скачаны csv
+  data_processed: "data/processed/"      # сюда будем сохранять после feature eng
+  models:      "models/"                 # сохранённые модели
+  logs:        "logs/"                   # логи
+  notebooks:   "notebooks/"              # артефакты (графики, отчёты)
+
+# ====================== ДАННЫЕ ======================
+data:
+  dataset_slug: "hamzaghanmi/expresso-churn-prediction-challenge"   # ← добавил
+
+# ====================== МОДЕЛЬ ======================
+model:
+  name: "xgboost"
+  version: "local_baseline_v1"
+  random_state: 42
+  test_size: 0.2
+  early_stopping_rounds: 50
+
+# ====================== ПРЕДОБРАБОТКА ======================
+preprocessing:
+  fillna_num: "median"
+  fillna_cat: "missing"
+  target_encoding: true
+  categorical_columns: ["REGION", "TENURE", "TOP_PACK"]
+
+# ====================== ОБУЧЕНИЕ ======================
+training:
+  objective: "binary:logistic"
+  eval_metric: "auc"
+  max_depth: 6
+  learning_rate: 0.1
+  n_estimators: 500
+  subsample: 0.8
+  colsample_bytree: 0.8
+
+# ====================== ЛОГИРОВАНИЕ ======================
+logging:
+  level: "INFO"
+  use_coloredlogs: true
