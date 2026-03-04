@@ -1,8 +1,9 @@
 # project ignore
+.vscode/
 data/
 bank-customer-classification/
-.vscode/
 notebooks/reports/
+logs/
 
 *.csv
 *.parquet

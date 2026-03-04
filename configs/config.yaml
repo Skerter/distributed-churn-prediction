@@ -39,3 +39,5 @@ training:
 logging:
   level: "INFO"
   use_coloredlogs: true
+  log_to_file: true
+  eda_log_file: "logs/eda_local.log"
