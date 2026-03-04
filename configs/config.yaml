@@ -20,7 +20,7 @@ model:
 
 # ====================== ПРЕДОБРАБОТКА ======================
 preprocessing:
-  fillna_num: "median"
+  fillna_num: "median"  # доступно median, mean
   fillna_cat: "missing"
   target_encoding: true
   categorical_columns: ["REGION", "TENURE", "TOP_PACK"]
