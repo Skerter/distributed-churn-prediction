@@ -1,13 +1,14 @@
 # project ignore
 .vscode/
 data/
-bank-customer-classification/
 notebooks/reports/
 logs/
+archive/
 
 *.csv
 *.parquet
 *.pkl
+*.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

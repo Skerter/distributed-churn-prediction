@@ -1,92 +1,112 @@
 import pandas as pd
-import numpy as np
-from pathlib import Path
-import yaml
-import logging, coloredlogs
-from datetime import datetime
 
+from src.utils.config import find_project_root, load_config
+from src.utils.logger import get_logger
+from src.features.preprocessing import fill_numeric_na, fill_categorical_na
+from src.features.feature_engineering import create_features
+from src.features.encoding import target_encode, save_encoding_maps
 
-def find_project_root(start_path: Path | None = None) -> Path:
-    """Ищем папку configs/, поднимаясь вверх по дереву"""
-    if start_path is None:
-        start_path = Path.cwd()
-    current = start_path.resolve()
-    while current != current.parent:
-        if (current / "configs").exists():
-            return current
-        current = current.parent
-    raise FileNotFoundError("Не удалось найти папку configs/")
-
+# Загрузка конфигурации
 PROJECT_ROOT = find_project_root()
-CONFIG_PATH = PROJECT_ROOT / "configs" / "config.yaml"
+config = load_config(PROJECT_ROOT)
 
-with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-    config = yaml.safe_load(f)
-
-logger = logging.getLogger(__name__)
-log_level = getattr(logging, config['logging']['level'])
-
-coloredlogs.install(
-    log_level=log_level,
-    logger=logger,
-    fmt='%(asctime)s [%(levelname)s] %(message)s',
-    level_styles={'info': {'color': 'green'}, 'error': {'color': 'red', 'bold': True}}
+# Настройка логгера
+logger = get_logger(
+    name=__name__, 
+    log_dir=PROJECT_ROOT / config["paths"]["logs"], 
+    log_prefix="build_features", 
+    level=config["logging"]["level"]
 )
 
-LOGS_DIR = PROJECT_ROOT / config['paths']['logs']
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-
-log_filename = LOGS_DIR / f'build_features_{datetime.now():%Y%m%d_%H%M%S}.log'
-file_handler = logging.FileHandler(log_filename, mode='a', encoding='utf-8')
-file_handler.setLevel(log_level)
-file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
-logger.addHandler(file_handler)
-
 logger.info("Корень проекта определён: %s", PROJECT_ROOT)
-logger.info("Логи сохраняются в: %s", log_filename)
+logger.info("Логи сохраняются в: %s", PROJECT_ROOT / config["paths"]["logs"])
 
+# Определяем пути к данным
 DATA_SOURCE = PROJECT_ROOT / config["paths"]["data_source"]
 DATA_PROCESSED = PROJECT_ROOT / config["paths"]["data_processed"]
 DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
 TRAIN_PATH = DATA_SOURCE / "Train.csv"
 TEST_PATH = DATA_SOURCE / "Test.csv"
+MAPS_PATH = DATA_PROCESSED / 'target_encoding_maps.json'
+TRAIN_PROCESSED_PATH = DATA_PROCESSED / 'train_processed.parquet'
+TEST_PROCESSED_PATH = DATA_PROCESSED / 'test_processed.parquet'
 
-def build_features():
+df_train = pd.read_csv(TRAIN_PATH)
+df_test = pd.read_csv(TEST_PATH)
+logger.info("Загружено Train: %s строк, Test: %s строк", len(df_train), len(df_test))
+
+
+def validate_columns(df: pd.DataFrame, required_cols: list) -> None:
+    '''Проверяем, что в датафрейме есть все необходимые колонки
+    param df: входной датафрейм
+    param required_cols: список обязательных колонок'''
+
+    missing = set(required_cols) - set(df.columns)
+    if missing:
+        raise ValueError(f"Отсутствуют колонки: {missing}")
+
+
+def build_features(df_train: pd.DataFrame, df_test: pd.DataFrame) -> None:
+    '''Главная функция для построения признаков'''
+
     logger.info('Начало feature engineering')
-    
-    df_train = pd.read_csv(TRAIN_PATH)
-    df_test = pd.read_csv(TEST_PATH)
-    logger.info("Загружено Train: %s строк, Test: %s строк", len(df_train), len(df_test))
     
     cat_cols = config['preprocessing']['categorical_columns']
     smoothing = config['preprocessing']['smoothing']
     
-    num_cols = df_train.select_dtypes(include=[np.number]).columns.drop(['CHURN'], errors='ignore')
+    validate_columns(df_train, cat_cols + ["CHURN"])
     
-    for col in num_cols:
-        if config['preprocessing']['fillna_num'] == 'median':
-            fill_value = df_train[col].median()
-        elif config['preprocessing']['fillna_num'] == 'mean':
-            fill_value = df_train[col].mean()
-        else:
-            logger.error('Неожиданный fillna_num из config.yaml -> %s', config['preprocessing']['fillna_num'])
-            raise Exception('''В файле config.yaml в разделе preprocessing для числовых значений для заполнения N/A 
-                            выбрано %s, логикой проекта предусмотрено только mean и median''', str(config['preprocessing']['fillna_num']))
-        df_train[col] = df_train[col].fillna(fill_value)
-        df_test[col] = df_test[col].fillna(fill_value)
+    logger.info("Заполнение пропусков")
+    
+    df_train = fill_numeric_na(df_train, config["preprocessing"]["fillna_num"], target_col="CHURN")
+    df_test = fill_numeric_na(df_test, config["preprocessing"]["fillna_num"], target_col="CHURN")
+    
+    df_train = fill_categorical_na(df_train, cat_cols, fill_value=config['preprocessing']['fillna_cat'])
+    df_test = fill_categorical_na(df_test, cat_cols, fill_value=config['preprocessing']['fillna_cat'])
+ 
+    logger.info('Пропуски успешно заполнены')
+    
+    logger.info("Создание новых признаков (feature engineering)")
+
+    df_train = create_features(df_train)
+    df_test = create_features(df_test)
+    
+    logger.info("Создано 5 новых признаков: AVG_REVENUE, RECH_TO_DATA_RATIO, REGULARITY_SCORE, HAS_TOP_PACK, MISSING_ZONE")
+
+    # Если включено target encoding, то выполняем его
+    if config['preprocessing']['target_encoding']:
         
-    for col in cat_cols:
-        fill_value = config['preprocessing']['fillna_cat']
-        df_train[col] = df_train[col].fillna(fill_value)
-        df_test[col] = df_test[col].fillna(fill_value)
+        logger.info('Начало Target Encoding для категориальных признаков: %s', cat_cols)
+    
+        logger.debug('Параметр сглаживания для Target Encoding: %s', smoothing)
+        logger.debug('Целевая переменная для Target Encoding: %s', "CHURN")
+        logger.debug('Количество строк в Train перед Target Encoding: %s', len(df_train))
+        logger.debug('Количество строк в Test перед Target Encoding: %s', len(df_test))
         
-    logger.info('Пропуски заполнены')
-    # TODO продолжить написание новых признаков, при необходимости дропнуть ZONA1, ZONA2, MRG и другие мусорные признаки
+        df_train, df_test, target_enc_maps = target_encode(df_train, df_test, cat_cols, target="CHURN", smoothing=smoothing)
+        
+        save_encoding_maps(MAPS_PATH, target_enc_maps)
+
+        logger.info('Target Encoding завершен успешно')
+        
+        logger.debug('Маппинги сохранены в %s', MAPS_PATH)
+        logger.debug('Количество строк в Train после Target Encoding: %s', len(df_train))
+        logger.debug('Количество строк в Test после Target Encoding: %s', len(df_test))
+        
+    logger.info("Сохранение обработанных данных в Parquet формате")
+    
+    df_train.to_parquet(TRAIN_PROCESSED_PATH, index=False)
+    df_test.to_parquet(TEST_PROCESSED_PATH, index=False)
+
+    logger.info("Данные сохранены:")
+    logger.info("  - %s", TRAIN_PROCESSED_PATH)
+    logger.info("  - %s", TEST_PROCESSED_PATH)
+    logger.info("Feature engineering завершён успешно")
 
 
 if __name__ == "__main__":
     try:
-        build_features()
+        build_features(df_train, df_test)
     except Exception as e:
         logger.error("Ошибка при построении признаков: %s", str(e))
         raise

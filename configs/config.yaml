@@ -23,6 +23,7 @@ preprocessing:
   fillna_num: "median"  # доступно median, mean
   fillna_cat: "missing"
   target_encoding: true
+  smoothing: 10
   categorical_columns: ["REGION", "TENURE", "TOP_PACK"]
 
 # ====================== ОБУЧЕНИЕ ======================
@@ -37,7 +38,7 @@ training:
 
 # ====================== ЛОГИРОВАНИЕ ======================
 logging:
-  level: "INFO"
+  level: "INFO" # DEBUG, INFO, WARNING, ERROR, CRITICAL
   use_coloredlogs: true
   log_to_file: true
   eda_log_file: "logs/eda_local.log"
