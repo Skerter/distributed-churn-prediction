@@ -58,11 +58,11 @@ def build_features(df_train: pd.DataFrame, df_test: pd.DataFrame) -> None:
     
     logger.info("Заполнение пропусков")
     
-    df_train = fill_numeric_na(df_train, config["preprocessing"]["fillna_num"], target_col="CHURN")
-    df_test = fill_numeric_na(df_test, config["preprocessing"]["fillna_num"], target_col="CHURN")
+    df_train = fill_numeric_na(df_train, config["preprocessing"]["fillna_num"], "CHURN")
+    df_test = fill_numeric_na(df_test, config["preprocessing"]["fillna_num"], "CHURN")
     
-    df_train = fill_categorical_na(df_train, cat_cols, fill_value=config['preprocessing']['fillna_cat'])
-    df_test = fill_categorical_na(df_test, cat_cols, fill_value=config['preprocessing']['fillna_cat'])
+    df_train = fill_categorical_na(df_train, cat_cols, config['preprocessing']['fillna_cat'])
+    df_test = fill_categorical_na(df_test, cat_cols, config['preprocessing']['fillna_cat'])
  
     logger.info('Пропуски успешно заполнены')
     

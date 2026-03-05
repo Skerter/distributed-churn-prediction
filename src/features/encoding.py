@@ -1,9 +1,10 @@
-import json
 import pandas as pd
+import json
 
 
 def target_encode(train: pd.DataFrame, test: pd.DataFrame, cols: list, target: str, smoothing: float) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    '''Выполняем target encoding для списка колонок cols. Возвращаем преобразованные датафреймы и словарь с маппингами для каждой колонки'''
+    '''Выполняем target encoding для списка колонок cols.
+    Возвращаем преобразованные датафреймы и словарь с маппингами для каждой колонки'''
 
     prior = train[target].mean()
     maps = {}
