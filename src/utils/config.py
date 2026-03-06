@@ -1,6 +1,8 @@
 from pathlib import Path
 import yaml
 
+from src.utils.logger import get_logger
+
 
 def find_project_root(start_path: Path | None = None) -> Path:
     """Поиск корня проекта (директория где есть configs/)"""
@@ -12,6 +14,14 @@ def find_project_root(start_path: Path | None = None) -> Path:
 
     while current != current.parent:
         if (current / "configs").exists():
+            config = load_config(current)
+            logger = get_logger(
+                name=__name__, 
+                log_dir=current / config["paths"]["logs"], 
+                log_prefix="config_test", 
+                level=config["logging"]["level"]
+            )
+            logger.info("Корень проекта определён: %s", current)
             return current
         current = current.parent
 

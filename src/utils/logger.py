@@ -33,6 +33,7 @@ def get_logger(name: str, log_dir: Path, log_prefix: str = "app", level: str = "
     file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] [%(name)s] %(message)s"))
     logger.addHandler(file_handler)
     
-    logger.debug("Логгер '%s' инициализирован. Логи сохраняются в: %s", name, log_file)
+    logger.info('Логгер %s инициализирован', name)
+    logger.debug("Уровень: %s. Логи сохраняются в: %s. ", level, log_file)
 
     return logger
