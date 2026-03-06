@@ -53,6 +53,27 @@ End-to-end ML-пайплайн для предсказания оттока кл
  ┣ 📜main_local.py
  ┗ 📜README.md
 
+
+- `configs/` — конфигурационные файлы (settings, окружения).
+- `data/` — данные:
+  - `processed/` — обработанные данные.
+  - `source/` — исходные данные.
+- `logs/` — логи работы скрипта.
+- `models/` — обученные модели.
+- `notebooks/` — Jupyter notebooks для EDA и анализа.
+- `reports/` — отчёты и визуализации.
+- `src/` — основной код:
+  - `data/` — загрузка и обработка данных.
+  - `features/` — инженерия признаков.
+  - `models/` — обучение моделей.
+  - `evaluation/` — оценка моделей.
+  - `utils/` — утилиты (логирование, конфигурация).
+  - `preprocessing.py` — препроцессинг данных.
+  - `main.py` — точка входа в проект.
+- `.gitignore` — игнорируемые файлы Git.
+- `environment.yml` — зависимости окружения.
+- `README.md` — документация проекта.
+
 ## Установка и запуск локального прототипа
 1. `conda env create -f environment.yml && conda activate dist-churn-pred-env`
 2. `python main_local.py` (full run: load → features → train → eval, ~10–15 мин)
