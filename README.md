@@ -13,21 +13,45 @@ End-to-end ML-пайплайн для предсказания оттока кл
 - Config: YAML для reproducibility.
 
 ## Структура проекта
-distributed-churn-prediction/
-├── data/                  # .gitignore: source/, processed/
-├── src/
-│   ├── data/              # load_data.py
-│   ├── features/          # build_features.py (target encoding, новые признаки)
-│   ├── models/            # train.py (XGBoost + CV + early stopping)
-│   └── evaluation/        # evaluate.py (метрики + графики)
-├── notebooks/             # 01_eda_local.ipynb, 02_local_results.ipynb, plots/
-├── configs/               # config.yaml
-├── logs/                  # train_*.log, etc.
-├── models/                # xgboost_local_v1.pkl
-├── main_local.py          # End-to-end запуск
-├── .gitignore
-├── environment.yml        # Conda env
-└── README.md
+📦distributed-churn-prediction
+ ┣ 📂configs
+ ┃ ┗ 📜config.yaml
+ ┣ 📂data
+ ┃ ┣ 📂processed
+ ┃ ┗ 📂source
+ ┣ 📂logs
+ ┣ 📂models
+ ┣ 📂notebooks
+ ┃ ┣ 📂eval_plots
+ ┃ ┣ 📂model_plots
+ ┃ ┣ 📂reports
+ ┃ ┣ 📜01_eda_local.ipynb
+ ┃ ┗ 📜02_local_results.ipynb
+ ┣ 📂src
+ ┃ ┣ 📂data
+ ┃ ┃ ┣ 📜load_data.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂evaluation
+ ┃ ┃ ┣ 📜evaluate.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂features
+ ┃ ┃ ┣ 📜create_features.py
+ ┃ ┃ ┣ 📜encoding.py
+ ┃ ┃ ┣ 📜feature_engineering.py
+ ┃ ┃ ┣ 📜preprocessing.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┣ 📂models
+ ┃ ┃ ┗ 📜train.py
+ ┃ ┣ 📂utils
+ ┃ ┃ ┣ 📜config.py
+ ┃ ┃ ┣ 📜logger.py
+ ┃ ┃ ┗ 📜__init__.py
+ ┃ ┗ 📜__init__.py
+ ┣ 📜.gitignore
+ ┣ 📜environment.yml
+ ┣ 📜main.py
+ ┣ 📜main_local.py
+ ┗ 📜README.md
 
 ## Установка и запуск локального прототипа
 1. `conda env create -f environment.yml && conda activate dist-churn-pred-env`
