@@ -99,7 +99,7 @@ def train_model() -> None:
         n_estimators=config["training"]["n_estimators"],
         subsample=config["training"]["subsample"],
         colsample_bytree=config["training"]["colsample_bytree"],
-        early_stopping_rounds=config["model"]["early_stopping_rounds"],
+        early_stopping_rounds=config["model"]["early_stopping_rounds"],  # в xgboost.3.x early_stopping_rounds передается здесь, а не в fit()
         random_state=config["model"]["random_state"],
         n_jobs=-1
     )
