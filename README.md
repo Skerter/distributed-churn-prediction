@@ -13,66 +13,23 @@ End-to-end ML-пайплайн для предсказания оттока кл
 - Config: YAML для reproducibility.
 
 ## Структура проекта
-📦distributed-churn-prediction
- ┣ 📂configs
- ┃ ┗ 📜config.yaml
- ┣ 📂data
- ┃ ┣ 📂processed
- ┃ ┗ 📂source
- ┣ 📂logs
- ┣ 📂models
- ┣ 📂notebooks
- ┃ ┣ 📂eval_plots
- ┃ ┣ 📂model_plots
- ┃ ┣ 📂reports
- ┃ ┣ 📜01_eda_local.ipynb
- ┃ ┗ 📜02_local_results.ipynb
- ┣ 📂src
- ┃ ┣ 📂data
- ┃ ┃ ┣ 📜load_data.py
- ┃ ┃ ┗ 📜__init__.py
- ┃ ┣ 📂evaluation
- ┃ ┃ ┣ 📜evaluate.py
- ┃ ┃ ┗ 📜__init__.py
- ┃ ┣ 📂features
- ┃ ┃ ┣ 📜create_features.py
- ┃ ┃ ┣ 📜encoding.py
- ┃ ┃ ┣ 📜feature_engineering.py
- ┃ ┃ ┣ 📜preprocessing.py
- ┃ ┃ ┗ 📜__init__.py
- ┃ ┣ 📂models
- ┃ ┃ ┗ 📜train.py
- ┃ ┣ 📂utils
- ┃ ┃ ┣ 📜config.py
- ┃ ┃ ┣ 📜logger.py
- ┃ ┃ ┗ 📜__init__.py
- ┃ ┗ 📜__init__.py
- ┣ 📜.gitignore
- ┣ 📜environment.yml
- ┣ 📜main.py
- ┣ 📜main_local.py
- ┗ 📜README.md
 
-
-- `configs/` — конфигурационные файлы (settings, окружения).
-- `data/` — данные:
-  - `processed/` — обработанные данные.
-  - `source/` — исходные данные.
-- `logs/` — логи работы скрипта.
-- `models/` — обученные модели.
-- `notebooks/` — Jupyter notebooks для EDA и анализа.
-- `reports/` — отчёты и визуализации.
-- `src/` — основной код:
-  - `data/` — загрузка и обработка данных.
-  - `features/` — инженерия признаков.
-  - `models/` — обучение моделей.
-  - `evaluation/` — оценка моделей.
-  - `utils/` — утилиты (логирование, конфигурация).
-  - `preprocessing.py` — препроцессинг данных.
-  - `main.py` — точка входа в проект.
-- `.gitignore` — игнорируемые файлы Git.
-- `environment.yml` — зависимости окружения.
-- `README.md` — документация проекта.
+**Описание структуры:**
+- **`configs/`** — содержит конфигурационные файлы (например, `config.yaml` с настройками проекта).
+- **`data/`** — разделён на `processed/` (обработанные данные) и `source/` (исходные данные).
+- **`logs/`** — хранит логи работы приложения для отладки и мониторинга.
+- **`models/`** — место хранения обученных моделей.
+- **`notebooks/`** — Jupyter-ноутбуки для анализа данных и визуализации (`EDA`, отчёты, графики).
+- **`src/`** — основной код проекта, структурированный по модулям:
+  - `data/` — загрузка и предварительная обработка данных;
+  - `evaluation/` — оценка качества моделей;
+  - `features/` — создание, преобразование и кодирование признаков;
+  - `models/` — обучение моделей;
+  - `utils/` — вспомогательные утилиты (логирование, работа с конфигурацией).
+- **`.gitignore`** — список файлов, которые не должны попадать в репозиторий.
+- **`environment.yml`** — файл с зависимостями окружения (например, для Conda).
+- **`main.py` и `main_local.py`** — точки входа в проект (основной и локальный запуск).
+- **`README.md`** — документация проекта с инструкциями и описанием.
 
 ## Установка и запуск локального прототипа
 1. `conda env create -f environment.yml && conda activate dist-churn-pred-env`
