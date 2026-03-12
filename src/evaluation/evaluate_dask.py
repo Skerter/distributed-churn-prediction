@@ -11,7 +11,6 @@ from sklearn.metrics import (
 )
 from dask_ml.model_selection import train_test_split
 
-# Импорты из utils
 from src.utils.config import find_project_root, load_config
 from src.utils.logger import get_logger
 
@@ -19,7 +18,6 @@ from src.utils.logger import get_logger
 # ====================== КОНФИГ И ЛОГГЕР ======================
 PROJECT_ROOT = find_project_root()
 config = load_config(PROJECT_ROOT)
-
 logger = get_logger(
     name=__name__,
     log_dir=PROJECT_ROOT / config["paths"]["logs"],
@@ -57,15 +55,15 @@ def evaluate_model_dask() -> None:
     X = df.drop("CHURN", axis=1)
     y = df["CHURN"].astype("int8")
 
-    X_train, X_val, y_train, y_val = train_test_split(
+    X_train, X_test, y_train, y_test = train_test_split(
         X, y,
         test_size=config["model"]["test_size"],
         random_state=config["model"]["random_state"]
     )
 
     # Persist для ускорения предсказания
-    X_val = X_val.persist()
-    y_val = y_val.persist()
+    X_test = X_test.persist()
+    y_test = y_test.persist()
 
     logger.info("Hold-out выборка подготовлена (distributed)")
 
@@ -76,25 +74,25 @@ def evaluate_model_dask() -> None:
 
     # Переводим в pandas только для метрик и графиков — данные не огромные и это проще для sklearn-метрик
     # Для по-настоящему больших данных здесь можно использовать xgboost.dask.predict
-    X_val_pd = X_val.compute()
-    y_val_pd = y_val.compute()
+    X_test_pd = X_test.compute()
+    y_test_pd = y_test.compute()
 
-    dmatrix_val = xgb.DMatrix(X_val_pd)
-    y_pred_proba = booster.predict(dmatrix_val)
+    dmatrix_test = xgb.DMatrix(X_test_pd)
+    y_pred_proba = booster.predict(dmatrix_test)
     y_pred = (y_pred_proba > 0.5).astype(int)
 
     logger.info(f"Предсказания получены за {time.time() - start_time:.2f} сек")
 
     # ====================== МЕТРИКИ ======================
-    roc_auc = roc_auc_score(y_val_pd, y_pred_proba)
-    pr_auc = average_precision_score(y_val_pd, y_pred_proba)
-    logloss = log_loss(y_val_pd, y_pred_proba)
+    roc_auc = roc_auc_score(y_test_pd, y_pred_proba)
+    pr_auc = average_precision_score(y_test_pd, y_pred_proba)
+    logloss = log_loss(y_test_pd, y_pred_proba)
 
     # Precision@top-10% (бизнес-метрика для churn: кого первым спасать)
-    top_k = int(len(y_val_pd) * 0.1)
+    top_k = int(len(y_test_pd) * 0.1)
     threshold = np.sort(y_pred_proba)[::-1][top_k - 1]
     y_pred_top = (y_pred_proba >= threshold).astype(int)
-    precision_top = precision_score(y_val_pd, y_pred_top)
+    precision_top = precision_score(y_test_pd, y_pred_top)
 
     logger.info("Метрики на hold-out (Dask пайплайн):")
     logger.info("  ROC-AUC:     %.4f", roc_auc)
@@ -109,7 +107,7 @@ def evaluate_model_dask() -> None:
 
     # ====================== ГРАФИКИ ======================
     # Confusion Matrix
-    cm = confusion_matrix(y_val_pd, y_pred)
+    cm = confusion_matrix(y_test_pd, y_pred)
     plt.figure(figsize=(6, 4))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
     plt.title("Confusion Matrix (Dask XGBoost)")
@@ -119,7 +117,7 @@ def evaluate_model_dask() -> None:
     plt.close()
 
     # ROC Curve
-    fpr, tpr, _ = roc_curve(y_val_pd, y_pred_proba)
+    fpr, tpr, _ = roc_curve(y_test_pd, y_pred_proba)
     plt.figure(figsize=(8, 6))
     plt.plot(fpr, tpr, label=f"ROC-AUC = {roc_auc:.4f}")
     plt.plot([0, 1], [0, 1], linestyle="--")
@@ -131,7 +129,7 @@ def evaluate_model_dask() -> None:
     plt.close()
 
     # PR Curve
-    precision, recall, _ = precision_recall_curve(y_val_pd, y_pred_proba)
+    precision, recall, _ = precision_recall_curve(y_test_pd, y_pred_proba)
     plt.figure(figsize=(8, 6))
     plt.plot(recall, precision, label=f"PR-AUC = {pr_auc:.4f}")
     plt.title("Precision-Recall Curve (Dask XGBoost)")

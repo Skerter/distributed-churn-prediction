@@ -134,6 +134,7 @@ def safe_remove(path: str) -> None:
             shutil.rmtree(path)
         else:
             os.remove(path)
+    logger.warning("Удалён старый файл/директория: %s", path)
 
 
 # ====================== ОСНОВНАЯ ЛОГИКА ======================

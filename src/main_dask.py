@@ -56,6 +56,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
+        logger.info("Dask Dashboard: http://localhost:8787) - для мониторинга распределённых задач")
+        logger.debug('Аргументы командной строки: %s', args)
         run_pipeline(args)
     except Exception as e:
         logger.error(f"Ошибка в Dask-пайплайне: {e}")

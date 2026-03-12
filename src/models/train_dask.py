@@ -126,7 +126,7 @@ def train_model_dask() -> None:
 if __name__ == "__main__":
     from dask.distributed import Client
 
-    with Client(n_workers=4, threads_per_worker=1, memory_limit="4GB") as client:
+    with Client(n_workers=4, threads_per_worker=1, memory_limit="4GB", dashboard_address=":8787") as client:
         logger.info("Dask Client запущен: %s", client)
         try:
             train_model_dask()
