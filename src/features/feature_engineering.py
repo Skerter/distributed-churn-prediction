@@ -6,15 +6,13 @@ from src.features.preprocessing import fill_numeric_na, fill_categorical_na
 from src.features.create_features import create_features
 from src.features.encoding import target_encode, save_encoding_maps
 
-# Загрузка конфигурации
+# ====================== КОНФИГ И ЛОГГЕР ======================
 PROJECT_ROOT = find_project_root()
 config = load_config(PROJECT_ROOT)
-
-# Настройка логгера
 logger = get_logger(
     name=__name__, 
     log_dir=PROJECT_ROOT / config["paths"]["logs"], 
-    log_prefix="build_features", 
+    log_prefix="feature_engineering_local", 
     level=config["logging"]["level"]
 )
 
