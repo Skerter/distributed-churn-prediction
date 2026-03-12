@@ -6,6 +6,7 @@
 
     // === Code Runner + UTF-8 ===
     "code-runner.runInTerminal": true,
+    "code-runner.runInOutput": false,
     "code-runner.clearPreviousOutput": true,
     "code-runner.showRunCommandInTerminal": true,
 
