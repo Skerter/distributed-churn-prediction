@@ -16,7 +16,7 @@ config = load_config(PROJECT_ROOT)
 logger = get_logger(
     name=__name__,
     log_dir=PROJECT_ROOT / config["paths"]["logs"],
-    log_prefix="train_model",
+    log_prefix="train_local",
     level=config["logging"]["level"]
 )
 
@@ -32,17 +32,14 @@ MODEL_PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 TRAIN_PROCESSED_PATH = DATA_PROCESSED / "train_processed.parquet"
 MODEL_PATH = MODELS_DIR / f"{config['model']['name']}_{config['model']['version']}.pkl"
 
-def load_data(path) -> pd.DataFrame:
-    logger.info("Загрузка данных из %s", path)
-    df = pd.read_parquet(path)
-    logger.info("Данные загружены: %s строк, %s столбцов", df.shape[0], df.shape[1])
-    return df
 
 # ====================== ОБУЧЕНИЕ ======================
 def train_model() -> None:
-    logger.info("Начало обучения модели XGBoost (локальный прототип)")
+    logger.info("Начало обучения модели XGBoost локально")
 
-    df = load_data(TRAIN_PROCESSED_PATH)
+    logger.info("Загрузка данных из %s", TRAIN_PROCESSED_PATH)
+    df = pd.read_parquet(TRAIN_PROCESSED_PATH)
+    logger.info("Данные загружены: %s строк, %s столбцов", df.shape[0], df.shape[1])
 
     # Подготовка X, y
     if "user_id" in df.columns:

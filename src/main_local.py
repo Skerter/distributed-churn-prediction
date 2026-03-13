@@ -1,13 +1,11 @@
 import argparse
 from datetime import datetime
 
-# Импорты модулей пайплайна
-from src.data.load_data import download_dataset
-from src.features.feature_engineering import feature_engineering
-from src.models.train import train_model
+from src.data.download_dataset import download_dataset
+from src.features.feature_engineering_local import feature_engineering
+from src.models.train_local import train_model
 from src.evaluation.evaluate import evaluate_model
 
-# Импорты для конфигурации и логгера
 from src.utils.config import find_project_root, load_config
 from src.utils.logger import get_logger
 
@@ -27,22 +25,18 @@ def run_pipeline(args):
     start_time = datetime.now()
     logger.info("Запуск локального пайплайна (end-to-end)")
 
-    # Шаг 1: Загрузка данных
     if not args.skip_load:
         logger.info("Шаг 1: Загрузка данных")
         download_dataset()
 
-    # Шаг 2: Feature Engineering
     if not args.skip_features:
         logger.info("Шаг 2: Feature Engineering")
         feature_engineering()
 
-    # Шаг 3: Обучение модели
     if not args.skip_train:
         logger.info("Шаг 3: Обучение модели")
         train_model()
 
-    # Шаг 4: Оценка модели
     if not args.skip_eval:
         logger.info("Шаг 4: Оценка модели")
         evaluate_model()
