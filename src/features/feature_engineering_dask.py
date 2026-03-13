@@ -6,6 +6,7 @@ import os
 
 from src.utils.config import find_project_root, load_config
 from src.utils.logger import get_logger
+from src.utils.file_utils import safe_remove
 
 
 # ====================== КОНФИГ И ЛОГГЕР ======================
@@ -125,16 +126,6 @@ def save_encoding_maps(path: str, maps: dict) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(maps, f, ensure_ascii=False, indent=2)
     logger.info("Маппинги Target Encoding сохранены: %s", path)
-    
-
-def safe_remove(path: str) -> None:
-    '''Безопасно удаляем файл или директорию, если она существует'''
-    if os.path.exists(path):
-        if os.path.isdir(path):
-            shutil.rmtree(path)
-        else:
-            os.remove(path)
-    logger.warning("Удалён старый файл/директория: %s", path)
 
 
 # ====================== ОСНОВНАЯ ЛОГИКА ======================
@@ -194,9 +185,11 @@ def feature_engineering_dask() -> None:
         )
         save_encoding_maps(MAPS_PATH, target_enc_maps)
 
-    # удаляем старые parquet
-    safe_remove(TRAIN_PROCESSED_PATH)
-    safe_remove(TEST_PROCESSED_PATH)
+    logger.info("Удаление старых Parquet файлов из %s", DATA_PROCESSED)
+    del_train_processed = safe_remove(TRAIN_PROCESSED_PATH)
+    del_test_processed = safe_remove(TEST_PROCESSED_PATH)
+    if not del_train_processed and not del_test_processed:
+        logger.info("Старых Parquet файлов не было, или они уже были удалены")
 
     train_df.to_parquet(TRAIN_PROCESSED_PATH, engine="pyarrow", write_index=False)
     test_df.to_parquet(TEST_PROCESSED_PATH, engine="pyarrow", write_index=False)

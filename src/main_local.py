@@ -2,7 +2,7 @@ import argparse
 from datetime import datetime
 
 from src.data.download_dataset import download_dataset
-from src.features.feature_engineering import feature_engineering
+from src.features.feature_engineering_local import feature_engineering
 from src.models.train_local import train_model
 from src.evaluation.evaluate import evaluate_model
 
