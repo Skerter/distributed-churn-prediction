@@ -43,3 +43,8 @@ logging:
   use_coloredlogs: true
   log_to_file: true
   eda_log_file: "logs/eda_local.log"
+# ====================== DASK ======================
+dask:
+  mode: "k8s"   # pandas | dask_local | k8s
+  scheduler_address: "tcp://churn-cluster-scheduler:8786"
+  n_workers: 2
