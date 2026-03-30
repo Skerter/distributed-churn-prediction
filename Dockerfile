@@ -5,14 +5,11 @@ FROM continuumio/miniconda3:latest
 WORKDIR /app
 
 # Копируем environment.yml в контейнер
-COPY environment.yml .
+COPY environment_linux.yml .
 
 # Создаём окружение conda и чистим кеш
 RUN conda env create -f environment_linux.yml && \
     conda clean -afy
-
-# Сделаем conda-окружение активным по умолчанию для всех следующих команд
-SHELL ["conda", "run", "-n", "dist-churn-pred-env", "/bin/bash", "-c"]
 
 # Копируем весь проект в контейнер
 COPY . .
@@ -20,5 +17,11 @@ COPY . .
 # Устанавливаем PYTHONPATH для проекта
 ENV PYTHONPATH=/app
 
-# Команда по умолчанию (замени src/main.py на реальный файл запуска)
-CMD ["python", "main.py"]
+# Указываем shell для всех последующих команд, чтобы conda environment использовалось
+SHELL ["conda", "run", "-n", "dist-churn-pred-env", "/bin/bash", "-c"]
+
+# ENTRYPOINT теперь активирует conda environment
+ENTRYPOINT ["conda", "run", "-n", "dist-churn-pred-env"]
+
+# CMD оставляем пустым — Kubernetes задаёт args: dask-scheduler / dask-worker
+CMD []

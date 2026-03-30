@@ -1,0 +1,35 @@
+apiVersion: kubernetes.dask.org/v1
+kind: DaskCluster
+metadata:
+  name: dask-cluster
+spec:
+  idleTimeout: 0
+  scheduler:
+    service:
+      type: ClusterIP
+      ports:
+        - name: tcp-scheduler
+          port: 8786
+          targetPort: tcp-scheduler
+        - name: http-ui
+          port: 8787
+          targetPort: http-ui
+    spec:
+      containers:
+        - name: scheduler
+          image: docker.io/library/dcp_v1:latest
+          imagePullPolicy: IfNotPresent
+          args: ["dask-scheduler"]
+          ports:
+            - containerPort: 8786
+              name: tcp-scheduler
+            - containerPort: 8787
+              name: http-ui
+  worker:
+    replicas: 2
+    spec:
+      containers:
+        - name: worker
+          image: docker.io/library/dcp_v1:latest
+          imagePullPolicy: IfNotPresent
+          args: ["dask-worker", "--nthreads", "2", "--memory-limit", "2GB"]
