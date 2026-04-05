@@ -12,9 +12,7 @@ def build_parser() -> argparse.ArgumentParser:
     returns:
         argparse.ArgumentParser: Настроенный парсер аргументов.
     """
-    parser = argparse.ArgumentParser(
-        description="CLI для distributed-churn-prediction"
-    )
+    parser = argparse.ArgumentParser(description="CLI для distributed-churn-prediction")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -54,6 +52,26 @@ def build_parser() -> argparse.ArgumentParser:
         "--execute",
         action="store_true",
         help="Реально выполнить pipeline.run(). Без флага будет dry-run.",
+    )
+    run_parser.add_argument(
+        "--skip-load",
+        action="store_true",
+        help="Пропустить шаг загрузки датасета",
+    )
+    run_parser.add_argument(
+        "--skip-features",
+        action="store_true",
+        help="Пропустить шаг feature engineering",
+    )
+    run_parser.add_argument(
+        "--skip-train",
+        action="store_true",
+        help="Пропустить шаг обучения модели",
+    )
+    run_parser.add_argument(
+        "--skip-eval",
+        action="store_true",
+        help="Пропустить шаг оценки модели",
     )
 
     return parser

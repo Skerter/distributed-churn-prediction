@@ -43,6 +43,10 @@ def main() -> int:
             request = RunPipelineRequest(
                 profile=args.profile,
                 execute=args.execute,
+                skip_load=args.skip_load,
+                skip_features=args.skip_features,
+                skip_train=args.skip_train,
+                skip_eval=args.skip_eval,
             )
             response = run_pipeline(container, request)
             print(json.dumps(response.to_dict(), indent=2, ensure_ascii=False))

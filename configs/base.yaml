@@ -1,15 +1,22 @@
 app:
   name: "distributed-churn-prediction"
-  version: "0.1.0"
+  version: "0.2.0"
 
 paths:
   data_source: "data/source"
   data_processed: "data/processed"
   models: "models"
   logs: "logs"
+  notebooks: "notebooks"
+
+data:
+  dataset_slug: "hamzaghanmi/expresso-churn-prediction-challenge"
+  train_filename: "Train.csv"
+  test_filename: "Test.csv"
+  target_column: "CHURN"
 
 logging:
-  level: "INFO"
+  level: "DEBUG"
   log_to_file: true
   use_coloredlogs: true
   fmt: "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
@@ -24,3 +31,37 @@ dask:
 
 pipeline:
   default_execute: false
+
+model:
+  name: "xgboost"
+  version: "local_baseline_v1"
+  random_state: 42
+  test_size: 0.2
+  cv_folds: 5
+  early_stopping_rounds: 50
+
+preprocessing:
+  fillna_num: "median"
+  fillna_cat: "missing"
+  target_encoding: true
+  smoothing: 10
+  categorical_columns:
+    - "REGION"
+    - "TENURE"
+    - "TOP_PACK"
+  drop_columns:
+    - "user_id"
+    - "MRG"
+
+training:
+  objective: "binary:logistic"
+  eval_metric: "auc"
+  max_depth: 6
+  learning_rate: 0.1
+  n_estimators: 500
+  subsample: 0.8
+  colsample_bytree: 0.8
+  n_jobs: -1
+
+evaluation:
+  top_fraction: 0.1

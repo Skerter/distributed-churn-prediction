@@ -20,6 +20,15 @@ class PathsSettings:
     data_processed: str
     models: str
     logs: str
+    notebooks: str
+
+
+@dataclass(slots=True)
+class DataSettings:
+    dataset_slug: str | None
+    train_filename: str
+    test_filename: str
+    target_column: str
 
 
 @dataclass(slots=True)
@@ -48,14 +57,56 @@ class PipelineSettings:
 
 
 @dataclass(slots=True)
+class ModelSettings:
+    name: str
+    version: str
+    random_state: int
+    test_size: float
+    cv_folds: int
+    early_stopping_rounds: int
+
+
+@dataclass(slots=True)
+class PreprocessingSettings:
+    fillna_num: str
+    fillna_cat: str
+    target_encoding: bool
+    smoothing: float
+    categorical_columns: list[str]
+    drop_columns: list[str]
+
+
+@dataclass(slots=True)
+class TrainingSettings:
+    objective: str
+    eval_metric: str
+    max_depth: int
+    learning_rate: float
+    n_estimators: int
+    subsample: float
+    colsample_bytree: float
+    n_jobs: int
+
+
+@dataclass(slots=True)
+class EvaluationSettings:
+    top_fraction: float = 0.1
+
+
+@dataclass(slots=True)
 class Settings:
     project_root: Path
     app: AppMetaSettings
     paths: PathsSettings
+    data: DataSettings
     logging: LoggingSettings
     runtime: RuntimeSettings
     dask: DaskSettings
     pipeline: PipelineSettings
+    model: ModelSettings
+    preprocessing: PreprocessingSettings
+    training: TrainingSettings
+    evaluation: EvaluationSettings
 
     @property
     def data_source_dir(self) -> Path:
@@ -73,6 +124,10 @@ class Settings:
     def logs_dir(self) -> Path:
         return self.project_root / self.paths.logs
 
+    @property
+    def notebooks_dir(self) -> Path:
+        return self.project_root / self.paths.notebooks
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "project_root": str(self.project_root),
@@ -85,6 +140,13 @@ class Settings:
                 "data_processed": self.paths.data_processed,
                 "models": self.paths.models,
                 "logs": self.paths.logs,
+                "notebooks": self.paths.notebooks,
+            },
+            "data": {
+                "dataset_slug": self.data.dataset_slug,
+                "train_filename": self.data.train_filename,
+                "test_filename": self.data.test_filename,
+                "target_column": self.data.target_column,
             },
             "logging": {
                 "level": self.logging.level,
@@ -103,6 +165,35 @@ class Settings:
             "pipeline": {
                 "default_execute": self.pipeline.default_execute,
             },
+            "model": {
+                "name": self.model.name,
+                "version": self.model.version,
+                "random_state": self.model.random_state,
+                "test_size": self.model.test_size,
+                "cv_folds": self.model.cv_folds,
+                "early_stopping_rounds": self.model.early_stopping_rounds,
+            },
+            "preprocessing": {
+                "fillna_num": self.preprocessing.fillna_num,
+                "fillna_cat": self.preprocessing.fillna_cat,
+                "target_encoding": self.preprocessing.target_encoding,
+                "smoothing": self.preprocessing.smoothing,
+                "categorical_columns": self.preprocessing.categorical_columns,
+                "drop_columns": self.preprocessing.drop_columns,
+            },
+            "training": {
+                "objective": self.training.objective,
+                "eval_metric": self.training.eval_metric,
+                "max_depth": self.training.max_depth,
+                "learning_rate": self.training.learning_rate,
+                "n_estimators": self.training.n_estimators,
+                "subsample": self.training.subsample,
+                "colsample_bytree": self.training.colsample_bytree,
+                "n_jobs": self.training.n_jobs,
+            },
+            "evaluation": {
+                "top_fraction": self.evaluation.top_fraction,
+            },
         }
 
     @classmethod
@@ -110,10 +201,15 @@ class Settings:
         try:
             app_data = data["app"]
             paths_data = data["paths"]
+            data_data = data["data"]
             logging_data = data["logging"]
             runtime_data = data["runtime"]
             dask_data = data.get("dask", {})
             pipeline_data = data.get("pipeline", {})
+            model_data = data["model"]
+            preprocessing_data = data["preprocessing"]
+            training_data = data["training"]
+            evaluation_data = data.get("evaluation", {})
         except KeyError as exc:
             raise ConfigError(f"В конфиге отсутствует обязательный ключ: {exc}") from exc
 
@@ -135,6 +231,13 @@ class Settings:
                 data_processed=paths_data["data_processed"],
                 models=paths_data["models"],
                 logs=paths_data["logs"],
+                notebooks=paths_data["notebooks"],
+            ),
+            data=DataSettings(
+                dataset_slug=data_data.get("dataset_slug"),
+                train_filename=data_data.get("train_filename", "Train.csv"),
+                test_filename=data_data.get("test_filename", "Test.csv"),
+                target_column=data_data.get("target_column", "CHURN"),
             ),
             logging=LoggingSettings(
                 level=logging_data["level"],
@@ -150,5 +253,34 @@ class Settings:
             ),
             pipeline=PipelineSettings(
                 default_execute=bool(pipeline_data.get("default_execute", False)),
+            ),
+            model=ModelSettings(
+                name=model_data["name"],
+                version=model_data["version"],
+                random_state=int(model_data["random_state"]),
+                test_size=float(model_data["test_size"]),
+                cv_folds=int(model_data["cv_folds"]),
+                early_stopping_rounds=int(model_data["early_stopping_rounds"]),
+            ),
+            preprocessing=PreprocessingSettings(
+                fillna_num=preprocessing_data["fillna_num"],
+                fillna_cat=preprocessing_data["fillna_cat"],
+                target_encoding=bool(preprocessing_data["target_encoding"]),
+                smoothing=float(preprocessing_data["smoothing"]),
+                categorical_columns=list(preprocessing_data["categorical_columns"]),
+                drop_columns=list(preprocessing_data.get("drop_columns", [])),
+            ),
+            training=TrainingSettings(
+                objective=training_data["objective"],
+                eval_metric=training_data["eval_metric"],
+                max_depth=int(training_data["max_depth"]),
+                learning_rate=float(training_data["learning_rate"]),
+                n_estimators=int(training_data["n_estimators"]),
+                subsample=float(training_data["subsample"]),
+                colsample_bytree=float(training_data["colsample_bytree"]),
+                n_jobs=int(training_data.get("n_jobs", -1)),
+            ),
+            evaluation=EvaluationSettings(
+                top_fraction=float(evaluation_data.get("top_fraction", 0.1)),
             ),
         )

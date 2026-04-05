@@ -42,12 +42,18 @@ class AppContainer:
                 f"Для режима {mode} не зарегистрирован pipeline"
             ) from exc
 
-    def build_pipeline(self) -> Any:
-        """Строит экземпляр pipeline на основе текущего режима выполнения, используя реестр pipeline и механизм динамического импорта.
-        returns:
+    def build_pipeline(self, run_options: dict[str, Any] | None = None) -> Any:
+        """Строит экземпляр pipeline на основе текущего режима выполнения и предоставленных опций запуска.
+
+        Args:
+            run_options (dict[str, Any] | None, optional): Опции пропуска этапов, флаги исполнения и профиль выполнения. По умолчанию None.
+
+        Raises:
+            PipelineResolutionError: Если не удалось импортировать или создать экземпляр pipeline на основе зарегистрированного пути.
+            PipelineResolutionError: Если не удалось создать экземпляр pipeline на основе зарегистрированного пути.
+
+        Returns:
             Any: Экземпляр класса pipeline, соответствующий текущему режиму выполнения.
-        raises:
-            PipelineResolutionError: Если не удалось разрешить или создать экземпляр pipeline для текущего режима выполнения.
         """
         dotted_path = self.get_pipeline_path()
 
@@ -65,6 +71,7 @@ class AppContainer:
                 config=self.settings,
                 logger=self.logger,
                 client=self.dask_client,
+                run_options=run_options,
             )
         except Exception as exc:
             raise PipelineResolutionError(
