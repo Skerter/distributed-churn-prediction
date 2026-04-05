@@ -1,13 +1,13 @@
 import argparse
 from datetime import datetime
 
-from src.data.download_dataset import download_dataset
-from src.features.feature_engineering_local import feature_engineering
-from src.models.train_local import train_model
-from src.evaluation.evaluate import evaluate_model
+from src.churn.infrastructure.datasets.download_dataset import download_dataset
+from src.churn.old_src.features.feature_engineering_local import feature_engineering
+from src.churn.old_src.models.train_local import train_model
+from src.churn.old_src.evaluation.evaluate import evaluate_model
 
-from src.utils.config import find_project_root, load_config
-from src.utils.logger import get_logger
+from src.churn.infrastructure.config.loader import find_project_root, load_config
+from src.churn.infrastructure.logging.factory import get_logger
 
 
 # ====================== КОНФИГ И ЛОГГЕР ======================

@@ -1,7 +1,7 @@
 from pathlib import Path
 import yaml
 
-from src.utils.logger import get_logger
+from src.churn.infrastructure.logging.factory import get_logger
 
 
 def find_project_root(start_path: Path | None = None) -> Path:

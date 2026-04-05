@@ -1,11 +1,11 @@
-from src.utils.config import find_project_root, load_config
-from src.utils.logger import get_logger
+from src.churn.infrastructure.config.loader import find_project_root, load_config
+from src.churn.infrastructure.logging.factory import get_logger
 
-from src.execution.backend import get_backend
-from src.execution.dask_client import create_client
+from src.churn.old_src.execution.backend import get_backend
+from src.churn.old_src.execution.dask_client import create_client
 
-from src.pipeline.pandas_pipeline import PandasPipeline
-from src.pipeline.dask_pipeline import DaskPipeline
+from src.churn.pipeline.pandas_pipeline import PandasPipeline
+from src.churn.pipeline.dask_pipeline import DaskPipeline
 
 
 def main():

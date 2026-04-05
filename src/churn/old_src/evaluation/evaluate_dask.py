@@ -11,8 +11,8 @@ from sklearn.metrics import (
 )
 from dask_ml.model_selection import train_test_split
 
-from src.utils.config import find_project_root, load_config
-from src.utils.logger import get_logger
+from src.churn.infrastructure.config.loader import find_project_root, load_config
+from src.churn.infrastructure.logging.factory import get_logger
 
 
 # ====================== КОНФИГ И ЛОГГЕР ======================
