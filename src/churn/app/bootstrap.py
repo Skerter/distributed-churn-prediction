@@ -27,7 +27,7 @@ def bootstrap(profile: str = "pandas") -> AppContainer:
 
     pipeline_registry = {
         "pandas": "src.churn.orchestration.pipelines.pandas.PandasPipeline",
-        "dask_local": "src.churn.orchestration.pipelines.dask_local.DaskPipeline",
+        "dask_local": "src.churn.orchestration.pipelines.dask_local.DaskLocalPipeline",
         "dask_k8s": "src.churn.orchestration.pipelines.dask_k8s.DaskK8sPipeline",
     }
 

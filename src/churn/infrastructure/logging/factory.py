@@ -44,8 +44,6 @@ def build_logger(settings: Settings, name: str | None = None) -> logging.Logger:
         stream_handler.setFormatter(logging.Formatter(settings.logging.fmt))
 
     if settings.logging.log_to_file:
-        settings.logs_dir.mkdir(parents=True, exist_ok=True)
-
         file_handler = logging.FileHandler(
             settings.logs_dir / "app.log",
             encoding="utf-8",
