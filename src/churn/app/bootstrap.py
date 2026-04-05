@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+from src.churn.app.container import AppContainer
+from src.churn.app.settings import Settings
+from src.churn.infrastructure.config.loader import find_project_root, load_settings_dict
+from src.churn.infrastructure.execution.backend import resolve_backend
+from src.churn.infrastructure.execution.dask_client import create_dask_client
+from src.churn.infrastructure.logging.factory import build_logger
+from src.churn.infrastructure.storage.paths import ensure_project_dirs
+
+
+def bootstrap(profile: str = "pandas") -> AppContainer:
+    """Инициализирует и настраивает все компоненты приложения, возвращая контейнер с готовыми к использованию объектами.
+    params:
+        profile (str): Профиль конфигурации, определяющий набор настроек для приложения (например, "pandas", "dask_local", "dask_k8s").
+    returns:
+        AppContainer: Контейнер, содержащий все инициализированные компоненты приложения, такие как настройки, логгер, бэкенд и Dask клиент.
+    """
+    project_root = find_project_root()
+    settings_dict = load_settings_dict(project_root=project_root, profile=profile)
+    settings = Settings.from_dict(settings_dict, project_root=project_root)
+
+    ensure_project_dirs(settings)
+    logger = build_logger(settings)
+    backend = resolve_backend(settings.runtime.mode)
+    dask_client = create_dask_client(settings, logger)
+
+    pipeline_registry = {
+        "pandas": "src.churn.orchestration.pipelines.pandas.PandasPipeline",
+        "dask_local": "src.churn.orchestration.pipelines.dask_local.DaskPipeline",
+        "dask_k8s": "src.churn.orchestration.pipelines.dask_k8s.DaskK8sPipeline",
+    }
+
+    logger.info(
+        "Bootstrap завершён: profile=%s mode=%s backend=%s",
+        profile,
+        settings.runtime.mode.value,
+        backend.value,
+    )
+
+    return AppContainer(
+        settings=settings,
+        logger=logger,
+        backend=backend,
+        dask_client=dask_client,
+        pipeline_registry=pipeline_registry,
+    )

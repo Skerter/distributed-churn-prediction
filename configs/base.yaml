@@ -1,0 +1,26 @@
+app:
+  name: "distributed-churn-prediction"
+  version: "0.1.0"
+
+paths:
+  data_source: "data/source"
+  data_processed: "data/processed"
+  models: "models"
+  logs: "logs"
+
+logging:
+  level: "INFO"
+  log_to_file: true
+  use_coloredlogs: true
+  fmt: "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+
+runtime:
+  mode: "pandas"
+
+dask:
+  scheduler_address: null
+  n_workers: 2
+  threads_per_worker: 1
+
+pipeline:
+  default_execute: false

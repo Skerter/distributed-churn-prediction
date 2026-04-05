@@ -1,0 +1,6 @@
+runtime:
+  mode: "dask_local"
+
+dask:
+  n_workers: 2
+  threads_per_worker: 1
