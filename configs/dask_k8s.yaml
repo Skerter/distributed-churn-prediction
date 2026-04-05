@@ -1,0 +1,6 @@
+runtime:
+  mode: "dask_k8s"
+
+dask:
+  # Адрес уебищный поменять на более понятный
+  scheduler_address: "tcp://churn-cluster-scheduler:8786" 
