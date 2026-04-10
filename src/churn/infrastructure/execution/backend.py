@@ -6,11 +6,14 @@ from src.churn.shared.exceptions import RuntimeModeError
 
 def resolve_backend(mode: RuntimeMode) -> BackendKind:
     """Определяет тип бекэнда на основе заданного режима выполнения.
-    params:
+
+    Args:
         mode (RuntimeMode): Режим выполнения приложения, определяющий выбор бекэнда.
-    returns:
+
+    Returns:
         BackendKind: Тип бекэнда, соответствующий заданному режиму выполнения.
-    raises:
+
+    Raises:
         RuntimeModeError: Если задан неизвестный режим выполнения.
     """
     if mode == RuntimeMode.PANDAS:

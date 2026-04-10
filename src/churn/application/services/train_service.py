@@ -5,16 +5,11 @@ from pathlib import Path
 from typing import Any
 
 import joblib
-import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from xgboost import XGBClassifier
 
 from src.churn.app.settings import Settings
-
-
-def _to_python_float(value: Any) -> float:
-    return float(value)
 
 
 def prepare_features_target(df: pd.DataFrame, settings: Settings, logger) -> tuple[pd.DataFrame, pd.Series]:
@@ -52,6 +47,14 @@ def prepare_features_target(df: pd.DataFrame, settings: Settings, logger) -> tup
 
 
 def _build_model(settings: Settings) -> XGBClassifier:
+    """Создание экземпляра модели XGBClassifier с параметрами из настроек.
+
+    Args:
+        settings (Settings): Настройки, содержащие параметры для модели.
+
+    Returns:
+        XGBClassifier: Экземпляр модели XGBClassifier с заданными параметрами.
+    """
     return XGBClassifier(
         objective=settings.training.objective,
         eval_metric=settings.training.eval_metric,
@@ -67,64 +70,81 @@ def _build_model(settings: Settings) -> XGBClassifier:
 
 
 def _save_json(path: Path, payload: dict[str, Any]) -> None:
+    """Сохранение данных в формате JSON.
+
+    Args:
+        path (Path): Путь к файлу для сохранения.
+        payload (dict[str, Any]): Данные для сохранения.
+    """
     with path.open("w", encoding="utf-8") as file:
         json.dump(payload, file, ensure_ascii=False, indent=2)
 
 
-def train_pandas_model(settings: Settings, logger) -> dict[str, Any]:
+def train_pandas_model(settings, logger) -> dict[str, object]:
+    """Обучение модели на обработанном датасете.
+
+    Args:
+        settings (_type_): Настройки для обучения модели.
+        logger (_type_): Логгер для записи информации.
+
+    Returns:
+        dict[str, object]: Результаты обучения модели.
+    """
     train_processed_path = settings.data_processed_dir / "train_processed.parquet"
-    if not train_processed_path.exists():
-        logger.error("Не найден parquet для обучения: %s", train_processed_path)
-        raise FileNotFoundError(
-            f"Не найден parquet для обучения: {train_processed_path}"
-        )
+    model_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}.pkl"
 
-    settings.models_dir.mkdir(parents=True, exist_ok=True)
-    model_plots_dir = settings.notebooks_dir / "model_plots"
-    model_plots_dir.mkdir(parents=True, exist_ok=True)
-
-    model_path = settings.models_dir / (
-        f"{settings.model.name}_{settings.model.version}.pkl"
-    )
-    train_summary_path = settings.models_dir / (
-        f"{settings.model.name}_{settings.model.version}_train_summary.json"
-    )
-    feature_importance_path = model_plots_dir / (
-        f"{settings.model.name}_{settings.model.version}_feature_importance.png"
-    )
-
-    logger.info("Старт обучения pandas/XGBoost модели")
-    logger.debug("train_processed_path=%s", train_processed_path)
-
+    logger.info("Загрузка обработанного train датасета: %s", train_processed_path)
     df = pd.read_parquet(train_processed_path)
-    logger.info("Parquet загружен: shape=%s", df.shape)
+    logger.info("Данные загружены: rows=%s cols=%s", df.shape[0], df.shape[1])
 
-    X, y = prepare_features_target(df, settings, logger)
+    if "user_id" in df.columns:
+        logger.debug("Удаляем служебную колонку user_id")
+        df = df.drop(columns=["user_id"])
 
-    logger.info("Запуск кросс-валидации: cv_folds=%s", settings.model.cv_folds)
+    logger.debug("Удаляем служебные колонки CHURN и MRG из признаков")
+    X = df.drop(columns=["CHURN", "MRG"], errors="ignore")
+    y = df["CHURN"].astype(int)
+
+    logger.debug("Матрица признаков: rows=%s cols=%s", X.shape[0], X.shape[1])
+    logger.debug("Доля положительного класса: %.6f", y.mean())
+
+    common_params = {
+        "objective": settings.training.objective,
+        "eval_metric": settings.training.eval_metric,
+        "max_depth": settings.training.max_depth,
+        "learning_rate": settings.training.learning_rate,
+        "n_estimators": settings.training.n_estimators,
+        "subsample": settings.training.subsample,
+        "colsample_bytree": settings.training.colsample_bytree,
+        "random_state": settings.model.random_state,
+        "n_jobs": settings.training.n_jobs,
+    }
+
+    cv_folds = settings.model.cv_folds
+    logger.info("Запуск кросс-валидации: cv_folds=%s", cv_folds)
+
     cv = StratifiedKFold(
-        n_splits=settings.model.cv_folds,
+        n_splits=cv_folds,
         shuffle=True,
         random_state=settings.model.random_state,
     )
 
-    cv_model = _build_model(settings)
+    # без early stopping для cross_val_score
+    model_cv = XGBClassifier(**common_params)
+
     cv_scores = cross_val_score(
-        cv_model,
+        model_cv,
         X,
         y,
         cv=cv,
         scoring="roc_auc",
-        n_jobs=settings.training.n_jobs,
+        n_jobs=1,          # безопаснее для xgboost на Windows
+        error_score="raise",
     )
 
-    logger.info(
-        "CV ROC-AUC: mean=%.6f std=%.6f",
-        cv_scores.mean(),
-        cv_scores.std(),
-    )
+    logger.info("CV ROC-AUC: mean=%.4f std=%.4f", cv_scores.mean(), cv_scores.std())
 
-    logger.info("Запуск финального train/validation split")
+    logger.info("Запуск финального обучения с early stopping")
     X_train, X_val, y_train, y_val = train_test_split(
         X,
         y,
@@ -132,15 +152,13 @@ def train_pandas_model(settings: Settings, logger) -> dict[str, Any]:
         stratify=y,
         random_state=settings.model.random_state,
     )
-    logger.debug(
-        "Train/val split: X_train=%s X_val=%s y_train=%s y_val=%s",
-        X_train.shape,
-        X_val.shape,
-        y_train.shape,
-        y_val.shape,
+
+    # Здесь early stopping включён
+    model = XGBClassifier(
+        **common_params,
+        early_stopping_rounds=settings.model.early_stopping_rounds,
     )
 
-    model = _build_model(settings)
     model.fit(
         X_train,
         y_train,
@@ -148,64 +166,17 @@ def train_pandas_model(settings: Settings, logger) -> dict[str, Any]:
         verbose=False,
     )
 
-    best_iteration = getattr(model, "best_iteration", None)
-    logger.info("Финальное обучение завершено. best_iteration=%s", best_iteration)
+    logger.info("Финальное обучение завершено")
+    logger.info("Лучшая итерация: %s", getattr(model, "best_iteration", None))
 
     joblib.dump(model, model_path)
     logger.info("Модель сохранена: %s", model_path)
 
-    importance = pd.Series(
-        model.feature_importances_,
-        index=X.columns,
-        dtype=float,
-    ).sort_values(ascending=False)
-
-    top20 = importance.head(20).sort_values()
-    plt.figure(figsize=(12, 8))
-    plt.barh(top20.index, top20.values)
-    plt.title("Top 20 Feature Importance (XGBoost)")
-    plt.xlabel("Importance")
-    plt.tight_layout()
-    plt.savefig(feature_importance_path, dpi=300, bbox_inches="tight")
-    plt.close()
-
-    logger.info("График importance сохранён: %s", feature_importance_path)
-
-    top_features = [
-        {"feature": feature, "importance": float(value)}
-        for feature, value in importance.head(10).items()
-    ]
-    for item in top_features[:5]:
-        logger.info(
-            "Top feature: %s -> %.6f",
-            item["feature"],
-            item["importance"],
-        )
-
-    summary = {
-        "cv": {
-            "roc_auc_mean": _to_python_float(cv_scores.mean()),
-            "roc_auc_std": _to_python_float(cv_scores.std()),
-            "scores": [_to_python_float(score) for score in cv_scores],
-        },
-        "model": {
-            "path": str(model_path),
-            "best_iteration": int(best_iteration) if best_iteration is not None else None,
-        },
-        "data": {
-            "train_rows": int(X_train.shape[0]),
-            "val_rows": int(X_val.shape[0]),
-            "n_features": int(X.shape[1]),
-        },
-        "artifacts": {
-            "model_path": str(model_path),
-            "train_summary_path": str(train_summary_path),
-            "feature_importance_plot": str(feature_importance_path),
-        },
-        "top_features": top_features,
+    return {
+        "model_path": str(model_path),
+        "train_rows": int(X_train.shape[0]),
+        "val_rows": int(X_val.shape[0]),
+        "cv_roc_auc_mean": float(cv_scores.mean()),
+        "cv_roc_auc_std": float(cv_scores.std()),
+        "best_iteration": int(model.best_iteration) if getattr(model, "best_iteration", None) is not None else None,
     }
-
-    _save_json(train_summary_path, summary)
-    logger.info("Train summary сохранён: %s", train_summary_path)
-
-    return summary

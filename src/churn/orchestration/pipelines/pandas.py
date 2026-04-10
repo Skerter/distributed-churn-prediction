@@ -10,25 +10,21 @@ from .base import BasePipeline
 
 class PandasPipeline(BasePipeline):
     def _run_impl(self) -> dict[str, object]:
+        """Реализует выполнение пайплайна в режиме pandas, последовательно выполняя шаги загрузки данных, обработки признаков, обучения модели и оценки модели, при этом учитывая опции пропуска шагов и логируя процесс выполнения.
+
+        Returns:
+            dict[str, object]: Результат выполнения пайплайна, содержащий информацию о выполненных и пропущенных шагах, а также артефакты, полученные на каждом этапе. 
+        """
         self.logger.info("Запущен реальный Pandas pipeline")
 
         if self.client is not None:
-            self.logger.warning(
-                "Для PandasPipeline был передан client=%s, хотя он не требуется",
-                type(self.client).__name__,
-            )
+            self.logger.warning("Для PandasPipeline был передан client=%s, хотя он не требуется", type(self.client).__name__)
 
-        if self.run_options["skip_features"] and (
-            not self.run_options["skip_train"] or not self.run_options["skip_eval"]
-        ):
-            self.logger.warning(
-                "Пропущен шаг features. Ожидается, что parquet-артефакты уже существуют."
-            )
+        if self.run_options["skip_features"] and (not self.run_options["skip_train"] or not self.run_options["skip_eval"]):
+            self.logger.warning("Пропущен шаг features. Ожидается, что parquet-артефакты уже существуют.")
 
         if self.run_options["skip_train"] and not self.run_options["skip_eval"]:
-            self.logger.warning(
-                "Пропущен шаг train. Ожидается, что обученная модель уже существует."
-            )
+            self.logger.warning("Пропущен шаг train. Ожидается, что обученная модель уже существует.")
 
         executed_steps: list[str] = []
         skipped_steps: list[str] = []
@@ -86,5 +82,4 @@ class PandasPipeline(BasePipeline):
             "artifacts": artifacts,
         }
 
-        self.logger.info("Pandas pipeline завершён успешно")
         return result

@@ -22,11 +22,7 @@ FEATURE_REQUIRED_COLUMNS = [
 ]
 
 
-def _validate_columns(
-    df: pd.DataFrame,
-    required_columns: list[str],
-    frame_name: str,
-) -> None:
+def _validate_columns(df: pd.DataFrame, required_columns: list[str], frame_name: str) -> None:
     """Проверяет наличие обязательных колонок в DataFrame.
 
     Args:
@@ -42,11 +38,7 @@ def _validate_columns(
         raise ValueError(f"В {frame_name} отсутствуют обязательные колонки: {missing}")
 
 
-def _build_numeric_fill_values(
-    train_df: pd.DataFrame,
-    strategy: str,
-    target_column: str,
-) -> dict[str, float]:
+def _build_numeric_fill_values(train_df: pd.DataFrame, strategy: str, target_column: str) -> dict[str, float]:
     """Строит значения для заполнения пропусков в числовых колонках.
 
     Args:
@@ -71,20 +63,13 @@ def _build_numeric_fill_values(
         elif strategy == "mean":
             fill_values[column] = float(train_df[column].mean())
         else:
-            raise ValueError(
-                f"Неизвестная стратегия fillna_num={strategy}. "
-                "Поддерживаются только mean и median."
-            )
+            raise ValueError(f"Неизвестная стратегия fillna_num={strategy}. "
+                             "Поддерживаются только mean и median.")
 
     return fill_values
 
 
-def _fill_numeric_na(
-    df: pd.DataFrame,
-    fill_values: dict[str, float],
-    logger,
-    frame_name: str,
-) -> pd.DataFrame:
+def _fill_numeric_na(df: pd.DataFrame, fill_values: dict[str, float], logger, frame_name: str) -> pd.DataFrame:
     """Заполняет пропуски в числовых колонках DataFrame.
 
     Args:
@@ -111,13 +96,8 @@ def _fill_numeric_na(
     return result
 
 
-def _fill_categorical_na(
-    df: pd.DataFrame,
-    categorical_columns: list[str],
-    fill_value: str,
-    logger,
-    frame_name: str,
-) -> pd.DataFrame:
+def _fill_categorical_na(df: pd.DataFrame, categorical_columns: list[str],
+                         fill_value: str, logger, frame_name: str) -> pd.DataFrame:
     """Заполняет пропуски в категориальных колонках DataFrame.
 
     Args:
@@ -162,14 +142,8 @@ def _create_features(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def _target_encode(
-    train_df: pd.DataFrame,
-    test_df: pd.DataFrame,
-    categorical_columns: list[str],
-    target_column: str,
-    smoothing: float,
-    logger,
-) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, dict[str, float]]]:
+def _target_encode(train_df: pd.DataFrame, test_df: pd.DataFrame,categorical_columns: list[str],
+                   target_column: str, smoothing: float, logger) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, dict[str, float]]]:
     """Применяет target encoding к указанным категориальным колонкам.
 
     Args:
@@ -225,7 +199,7 @@ def run_pandas_feature_engineering(settings: Settings, logger) -> dict[str, Any]
 
     Args:
         settings (Settings): Настройки для feature engineering
-        logger (_type_): Логгер для записи информации
+        logger (logging.Logger): Логгер для записи информации
 
     Raises:
         FileNotFoundError: если исходные CSV файлы не найдены

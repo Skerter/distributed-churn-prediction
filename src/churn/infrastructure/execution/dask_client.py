@@ -9,12 +9,15 @@ from src.churn.shared.exceptions import ConfigError
 
 def create_dask_client(settings: Settings, logger) -> Any | None:
     """Создает Dask client на основе настроек приложения.
-    params:
+
+    Args:
         settings (Settings): Настройки приложения, содержащие информацию о режиме выполнения и параметрах Dask.
         logger: Логгер для записи информации о процессе создания Dask client.
-    returns:
+
+    Returns:
         Any | None: Экземпляр Dask client для режимов Dask или None для режима pandas.
-    raises:
+
+    Raises:
         ConfigError: Если настройки некорректны для выбранного режима выполнения.
     """
     mode = settings.runtime.mode

@@ -22,9 +22,7 @@ def _find_file(root: Path, filename: str) -> Path:
     """
     matches = sorted(root.rglob(filename))
     if not matches:
-        raise FileNotFoundError(
-            f"Файл {filename} не найден в директории скачанного датасета {root}"
-        )
+        raise FileNotFoundError(f"Файл {filename} не найден в директории скачанного датасета {root}")
     return matches[0]
 
 

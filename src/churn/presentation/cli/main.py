@@ -13,7 +13,8 @@ from src.churn.presentation.cli.parser import build_parser
 
 def main() -> int:
     """Главная функция CLI приложения для управления ML pipeline.
-    returns:
+
+    Returns:
         int: Код завершения процесса (0 - успех, 1 - ошибка).
     """
     parser = build_parser()

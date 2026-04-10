@@ -10,13 +10,17 @@ from src.churn.shared.exceptions import ConfigError
 
 
 def find_project_root(start_path: Path | None = None) -> Path:
-    '''Ищет корень проекта, проверяя наличие папок configs/ и src/.
-    params:
-        - start_path: начальная точка для поиска корня проекта. Если None, используется текущая директория.
-    returns:
-        - Path: путь к корню проекта.
-    raises:
-        - ConfigError: если корень проекта не найден.'''
+    """Ищет корень проекта, проверяя наличие папок configs/ и src/.
+
+    Args:
+        start_path (Path | None, optional): Путь к начальной точке для поиска корня проекта. По умолчанию None.
+
+    Raises:
+        ConfigError: Если корень проекта не найден.
+
+    Returns:
+        Path: Путь к корню проекта.
+    """
     current = (start_path or Path.cwd()).resolve()
 
     for candidate in (current, *current.parents):
@@ -27,13 +31,17 @@ def find_project_root(start_path: Path | None = None) -> Path:
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
-    '''Загружает YAML-файл и возвращает его содержимое в виде словаря.
-    params:
-        - path: путь к YAML-файлу.
-    returns:
-        - dict[str, Any]: содержимое YAML-файла.
-    raises:
-        - ConfigError: если файл не найден или его содержимое не является словарём.'''
+    """Загружает YAML-файл и возвращает его содержимое в виде словаря.
+
+    Args:
+        path (Path): Путь к YAML-файлу.
+
+    Returns:
+        dict[str, Any]: Содержимое YAML-файла.
+
+    Raises:
+        ConfigError: Если файл не найден или его содержимое не является словарём.
+    """
     if not path.exists():
         raise ConfigError(f"Файл конфига не найден: {path}")
 
@@ -47,12 +55,16 @@ def load_yaml(path: Path) -> dict[str, Any]:
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    '''Глубоко сливает два словаря, рекурсивно объединяя вложенные словари.
-    params:
-        - base: базовый словарь.
-        - override: словарь для переопределения значений.
-    returns:
-        - dict[str, Any]: объединенный словарь.'''
+    """Глубоко сливает два словаря, рекурсивно объединяя вложенные словари.
+
+    Args:
+        base (dict[str, Any]): Базовый словарь.
+        override (dict[str, Any]): Словарь для переопределения значений.
+
+    Returns:
+        dict[str, Any]: Объединенный словарь.
+    """
+
     result = deepcopy(base)
 
     for key, value in override.items():
@@ -69,12 +81,15 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
 
 
 def load_settings_dict(project_root: Path, profile: str) -> dict[str, Any]:
-    '''Загружает и объединяет базовый и профильный конфиги.
-    params:
-        - project_root: путь к корню проекта.
-        - profile: имя профиля (pandas | dask_local | dask_k8s).
-    returns:
-        - dict[str, Any]: объединенный словарь настроек.'''
+    """Загружает и объединяет базовый и профильный конфиги.
+
+    Args:
+        project_root (Path): Путь к корню проекта.
+        profile (str): Имя профиля (pandas | dask_local | dask_k8s).
+
+    Returns:
+        dict[str, Any]: Объединенный словарь настроек.
+    """
     configs_dir = project_root / "configs"
 
     base_config = load_yaml(configs_dir / "base.yaml")

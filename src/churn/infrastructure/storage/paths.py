@@ -5,7 +5,8 @@ from src.churn.app.settings import Settings
 
 def ensure_project_dirs(settings: Settings) -> None:
     """Обеспечивает существование необходимых директорий для проекта.
-    params:
+
+    Args:
         settings (Settings): Настройки приложения, содержащие пути к директориям.
     """
     settings.data_source_dir.mkdir(parents=True, exist_ok=True)

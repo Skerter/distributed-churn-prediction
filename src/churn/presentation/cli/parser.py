@@ -9,7 +9,12 @@ def build_parser() -> argparse.ArgumentParser:
     1. health - проверка bootstrap и текущего профиля
     2. show-config - показать объединённый конфиг
     3. run-pipeline - запустить pipeline или выполнить dry-run
-    returns:
+    Каждая команда имеет свои аргументы, такие как --profile для указания профиля конфигурации и флаги для пропуска определённых шагов в случае команды run-pipeline.
+    
+    Raises:
+        argparse.ArgumentError: Если возникла ошибка при добавлении аргументов или команд к парсеру.
+
+    Returns:
         argparse.ArgumentParser: Настроенный парсер аргументов.
     """
     parser = argparse.ArgumentParser(description="CLI для distributed-churn-prediction")

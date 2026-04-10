@@ -10,11 +10,12 @@ from src.churn.app.settings import Settings
 
 def build_logger(settings: Settings, name: str | None = None) -> logging.Logger:
     """Создает и настраивает логгер на основе переданных настроек.
-    params:
+
+    Args:
         settings (Settings): Настройки приложения, содержащие параметры для конфигурации логгера.
         name (str | None, optional): Имя логгера. Если не указано, будет использовано имя из настроек приложения. По умолчанию None.
 
-    returns:
+    Returns:
         logging.Logger: Настроенный логгер, готовый к использованию в приложении.
     """
     logger_name = name or settings.app.name

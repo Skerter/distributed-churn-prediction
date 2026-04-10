@@ -24,11 +24,23 @@ from src.churn.application.services.train_service import prepare_features_target
 
 
 def _save_json(path: Path, payload: dict[str, Any]) -> None:
+    """Сохранение данных в формате JSON.
+
+    Args:
+        path (Path): Путь к файлу для сохранения.
+        payload (dict[str, Any]): Данные для сохранения.
+    """
     with path.open("w", encoding="utf-8") as file:
         json.dump(payload, file, ensure_ascii=False, indent=2)
 
 
 def _plot_confusion_matrix(cm: np.ndarray, output_path: Path) -> None:
+    """Построение и сохранение графика confusion matrix.
+
+    Args:
+        cm (np.ndarray): Матрица ошибок для построения графика.
+        output_path (Path): Путь для сохранения графика.
+    """
     plt.figure(figsize=(6, 4))
     plt.imshow(cm, interpolation="nearest")
     plt.title("Confusion Matrix")
@@ -49,6 +61,14 @@ def _plot_confusion_matrix(cm: np.ndarray, output_path: Path) -> None:
 
 
 def _plot_roc_curve(fpr: np.ndarray, tpr: np.ndarray, roc_auc: float, output_path: Path) -> None:
+    """Построение и сохранение графика ROC curve.
+
+    Args:
+        fpr (np.ndarray): Массив значений False Positive Rate.
+        tpr (np.ndarray): Массив значений True Positive Rate.
+        roc_auc (float): Значение ROC-AUC.
+        output_path (Path): Путь для сохранения графика.
+    """
     plt.figure(figsize=(8, 6))
     plt.plot(fpr, tpr, label=f"ROC-AUC = {roc_auc:.4f}")
     plt.plot([0, 1], [0, 1], linestyle="--")
@@ -62,6 +82,14 @@ def _plot_roc_curve(fpr: np.ndarray, tpr: np.ndarray, roc_auc: float, output_pat
 
 
 def _plot_pr_curve(recall: np.ndarray, precision: np.ndarray, pr_auc: float, output_path: Path) -> None:
+    """Построение и сохранение графика Precision-Recall кривой.
+
+    Args:
+        recall (np.ndarray): Массив значений Recall.
+        precision (np.ndarray): Массив значений Precision.
+        pr_auc (float): Значение PR-AUC.
+        output_path (Path): Путь для сохранения графика.
+    """
     plt.figure(figsize=(8, 6))
     plt.plot(recall, precision, label=f"PR-AUC = {pr_auc:.4f}")
     plt.title("Precision-Recall Curve")
@@ -74,6 +102,18 @@ def _plot_pr_curve(recall: np.ndarray, precision: np.ndarray, pr_auc: float, out
 
 
 def evaluate_pandas_model(settings: Settings, logger) -> dict[str, Any]:
+    """Оценивает модель на тестовой выборке.
+
+    Args:
+        settings (Settings): Настройки для оценки модели
+        logger (logging.Logger): Логгер для записи информации
+
+    Raises:
+        FileNotFoundError: если не найдены необходимые файлы для оценки (parquet или модель)
+
+    Returns:
+        dict[str, Any]: Результаты оценки модели, включая метрики и пути к сохраненным артефактам
+    """
     train_processed_path = settings.data_processed_dir / "train_processed.parquet"
     model_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}.pkl"
 
@@ -88,9 +128,7 @@ def evaluate_pandas_model(settings: Settings, logger) -> dict[str, Any]:
     eval_plots_dir = settings.notebooks_dir / "eval_plots"
     eval_plots_dir.mkdir(parents=True, exist_ok=True)
 
-    metrics_path = settings.models_dir / (
-        f"{settings.model.name}_{settings.model.version}_eval_metrics.json"
-    )
+    metrics_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}_eval_metrics.json"
     confusion_matrix_path = eval_plots_dir / "confusion_matrix.png"
     roc_curve_path = eval_plots_dir / "roc_curve.png"
     pr_curve_path = eval_plots_dir / "pr_curve.png"
