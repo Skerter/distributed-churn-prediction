@@ -67,11 +67,13 @@ class DaskLocalPipeline(BasePipeline):
         self.logger.info("Проверка конфигурации пайпайна")
     
         if self.config.runtime.mode.value != "dask_local":
-            self.logger.warning("DaskLocalPipeline запущен с некорректным runtime.mode=%s", self.config.runtime.mode.value)
+            self.logger.warning("DaskLocalPipeline ожидает runtime.mode='dask_local', но получено %s", self.config.runtime.mode.value)
+            raise RuntimeError(f"DaskLocalPipeline ожидает runtime.mode='dask_local', но получено '{self.config.runtime.mode.value}'")
 
         if not self.config.dask.n_workers or not self.config.dask.threads_per_worker:
             self.logger.warning("DaskLocalPipeline запущен с неполной Dask-конфигурацией: n_workers=%s, threads_per_worker=%s",
                                 self.config.dask.n_workers, self.config.dask.threads_per_worker)
+            raise RuntimeError("DaskLocalPipeline требует указания n_workers и threads_per_worker в конфигурации dask")
 
         self.logger.debug("n_workers=%s", self.config.dask.n_workers)
         self.logger.debug("threads_per_worker=%s", self.config.dask.threads_per_worker)

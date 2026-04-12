@@ -387,7 +387,7 @@ def _build_dask_numeric_fill_values(train_ddf: dd.DataFrame, strategy: str,
         elif strategy == "median":
             tasks[column] = train_ddf[column].median()
             
-    fill_values = dask.compute(tasks[0])
+    fill_values = dask.compute(tasks)[0]
     for column, value in fill_values.items():
         fill_values[column] = float(value)
     
@@ -549,14 +549,18 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
         dict[str, Any]: Словарь с метаданными feature engineering и путями
         к созданным артефактам.
     """
+    if client is None:
+        logger.error("run_dask_feature_engineering вызван без Dask client")
+        raise RuntimeError("Для Dask feature engineering требуется активный Dask client")
+
     logger.debug("Сборка путей к данным для dask_local feature engineering")
 
     source_dir = settings.data_source_dir
     processed_dir = settings.data_processed_dir
-    
+
     train_path = source_dir / settings.data.train_filename
     test_path = source_dir / settings.data.test_filename
-    
+
     if not train_path.exists():
         logger.error("Train CSV не найден: %s", train_path)
         raise FileNotFoundError(f"Не найден train dataset: {train_path}")
@@ -582,7 +586,7 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
     logger.info("CSV открыты через Dask: train_partitions=%s, test_partitions=%s",
                 train_ddf.npartitions, test_ddf.npartitions)
 
-    categorical_columns = settings.preprocessing.categorical_columns
+    categorical_columns = list(settings.preprocessing.categorical_columns)
     target_column = settings.data.target_column
     
     _validate_columns_by_names(
@@ -649,10 +653,8 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
     train_ddf.to_parquet(train_processed_path, write_index=False)
     test_ddf.to_parquet(test_processed_path, write_index=False)
     
-    train_rows, test_rows = dask.compute(
-        _count_dask_rows(train_ddf),
-        _count_dask_rows(test_ddf),
-    )
+    train_rows = _count_dask_rows(train_ddf)
+    test_rows = _count_dask_rows(test_ddf)
     
     logger.info("Dask feature engineering завершён успешно: train_rows=%s, test_rows=%s",
                 train_rows, test_rows)
