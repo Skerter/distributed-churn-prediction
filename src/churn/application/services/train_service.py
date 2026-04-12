@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from logging import Logger
-from pathlib import Path
 from typing import Any
 
 import joblib
 import pandas as pd
+import dask.dataframe as dd
+from dask.distributed import wait
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from xgboost import XGBClassifier
+from xgboost.dask import DaskXGBClassifier
 
 from src.churn.app.settings import Settings
 
@@ -59,6 +61,47 @@ def prepare_features_target(
     return X, y
 
 
+def prepare_dask_features_target(
+    ddf: dd.DataFrame,
+    settings: Settings,
+    logger: Logger,
+) -> tuple[dd.DataFrame, dd.Series]:
+    """Подготавливает признаки и целевую переменную для Dask local обучения.
+
+    Функция удаляет служебные колонки, проверяет наличие target-поля
+    и формирует матрицу признаков X и вектор целевой переменной y.
+
+    Args:
+        ddf (dd.DataFrame): Dask DataFrame с обработанными данными.
+        settings (Settings): Настройки приложения.
+        logger (Logger): Логгер для записи этапов подготовки данных.
+
+    Raises:
+        ValueError: Если в Dask DataFrame отсутствует целевая колонка.
+
+    Returns:
+        tuple[dd.DataFrame, dd.Series]: Признаки X и целевая переменная y.
+    """
+    result = ddf
+    target_column = settings.data.target_column
+
+    drop_columns = list(settings.preprocessing.drop_columns)
+    columns_to_drop = [column for column in drop_columns if column in result.columns]
+    if columns_to_drop:
+        logger.debug("Удаляем служебные колонки из Dask frame: %s", columns_to_drop)
+        result = result.drop(columns=columns_to_drop)
+
+    if target_column not in result.columns:
+        logger.error("Целевая колонка %s отсутствует в Dask frame", target_column)
+        raise ValueError(f"В Dask dataframe отсутствует колонка {target_column}")
+
+    X = result.drop(columns=[target_column])
+    y = result[target_column].astype("int64")
+
+    logger.debug("Подготовлены Dask X/y: columns=%s partitions=%s", list(X.columns), X.npartitions)
+    return X, y
+
+
 def _build_xgb_common_params(settings: Settings) -> dict[str, Any]:
     """Собирает общие параметры XGBoost из настроек проекта.
 
@@ -92,7 +135,7 @@ def _run_pandas_cross_validation(
 ) -> dict[str, float]:
     """Запускает кросс-валидацию для pandas-модели.
 
-    Здесь intentionally не используется early stopping, потому что
+    Здесь намеренно не используется early stopping, потому что
     `cross_val_score()` не передаёт validation set внутрь `fit()`.
 
     Args:
@@ -281,3 +324,131 @@ def train_dask_local_model(settings: Settings, logger: Logger, client) -> dict[s
     """
     logger.error("train_dask_local_model пока не реализован")
     raise NotImplementedError("Dask local training пока не реализован")
+
+
+def train_dask_local_model(
+    settings: Settings,
+    logger: Logger,
+    client,
+) -> dict[str, object]:
+    """Выполняет полный сценарий обучения модели в режиме dask_local.
+
+    Сценарий шага:
+    1. Загружаем обработанный parquet через Dask
+    2. Делаем distributed split через random_split
+    3. Подготавливаем Dask X/y
+    4. Materialize train/validation в памяти кластера через persist
+    5. Обучаем DaskXGBClassifier с early stopping
+    6. Сохраняем booster-модель
+    7. Возвращаем summary по обучению
+
+    Args:
+        settings (Settings): Настройки приложения.
+        logger (Logger): Логгер для записи этапов обучения.
+        client: Активный Dask client.
+
+    Raises:
+        RuntimeError: Если обучение вызвано без Dask client.
+        FileNotFoundError: Если parquet для обучения не найден.
+
+    Returns:
+        dict[str, object]: Сводка по distributed обучению модели.
+    """
+    if client is None:
+        logger.error("train_dask_local_model вызван без Dask client")
+        raise RuntimeError("Для Dask local training требуется активный Dask client")
+
+    train_processed_path = settings.data_processed_dir / "train_processed.parquet"
+    model_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}.json"
+
+    logger.info("Старт Dask local обучения")
+    logger.debug("train_processed_path=%s", train_processed_path)
+    logger.debug("model_path=%s", model_path)
+
+    if not train_processed_path.exists():
+        logger.error("Не найден parquet для обучения: %s", train_processed_path)
+        raise FileNotFoundError(f"Не найден parquet для обучения: {train_processed_path}")
+
+    ddf = dd.read_parquet(train_processed_path)
+    logger.info(
+        "Dask parquet загружен: partitions=%s columns=%s",
+        ddf.npartitions,
+        list(ddf.columns),
+    )
+
+    total_rows = int(ddf.map_partitions(len).sum().compute())
+    logger.info("Размер набора до split: rows=%s", total_rows)
+
+    logger.info(
+        "Подготовка distributed split: train_size=%.3f val_size=%.3f",
+        1.0 - settings.model.test_size,
+        settings.model.test_size,
+    )
+    train_ddf, val_ddf = ddf.random_split(
+        [1.0 - settings.model.test_size, settings.model.test_size],
+        random_state=settings.model.random_state,
+    )
+
+    X_train, y_train = prepare_dask_features_target(train_ddf, settings, logger)
+    X_val, y_val = prepare_dask_features_target(val_ddf, settings, logger)
+
+    logger.info("Persist train/validation наборов в памяти кластера")
+    X_train, y_train, X_val, y_val = client.persist([X_train, y_train, X_val, y_val])
+    wait([X_train, y_train, X_val, y_val])
+
+    train_rows = int(y_train.map_partitions(len).sum().compute())
+    val_rows = int(y_val.map_partitions(len).sum().compute())
+
+    try:
+        train_target_rate = float(y_train.mean().compute())
+        logger.debug("train target rate=%.6f", train_target_rate)
+    except Exception:
+        logger.warning("Не удалось вычислить train target rate")
+        train_target_rate = None
+
+    try:
+        val_target_rate = float(y_val.mean().compute())
+        logger.debug("val target rate=%.6f", val_target_rate)
+    except Exception:
+        logger.warning("Не удалось вычислить val target rate")
+        val_target_rate = None
+
+    logger.info(
+        "Split materialized: train_rows=%s val_rows=%s",
+        train_rows,
+        val_rows,
+    )
+
+    model = DaskXGBClassifier(
+        **_build_xgb_common_params(settings),
+        early_stopping_rounds=settings.model.early_stopping_rounds,
+        tree_method="hist",
+    )
+    model.client = client
+
+    logger.info("Запуск distributed fit DaskXGBClassifier")
+    model.fit(
+        X_train,
+        y_train,
+        eval_set=[(X_val, y_val)],
+        verbose=False,
+    )
+
+    best_iteration = getattr(model, "best_iteration", None)
+    logger.info("Dask local обучение завершено. Лучшая итерация: %s", best_iteration)
+
+    settings.models_dir.mkdir(parents=True, exist_ok=True)
+    booster = model.get_booster()
+    booster.save_model(model_path)
+    logger.info("Booster сохранён: %s", model_path)
+
+    return {
+        "model_path": str(model_path),
+        "train_rows": int(train_rows),
+        "val_rows": int(val_rows),
+        "train_partitions": int(X_train.npartitions),
+        "val_partitions": int(X_val.npartitions),
+        "train_target_rate": train_target_rate,
+        "val_target_rate": val_target_rate,
+        "best_iteration": int(best_iteration) if best_iteration is not None else None,
+    }
