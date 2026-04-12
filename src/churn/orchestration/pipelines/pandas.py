@@ -26,12 +26,12 @@ class PandasPipeline(BasePipeline):
         if self.run_options["skip_train"] and not self.run_options["skip_eval"]:
             self.logger.warning("Пропущен шаг train. Ожидается, что обученная модель уже существует.")
 
-        executed_steps: list[str] = []
-        skipped_steps: list[str] = []
-        artifacts: dict[str, object] = {}
+        executed_steps = []
+        skipped_steps = []
+        artifacts = {}
 
         if self.run_options["skip_load"]:
-            self.logger.warning("Шаг load пропущен")
+            self.logger.warning("Шаг load пропущен.")
             skipped_steps.append("load")
         else:
             self.logger.info("Шаг 1/4: load dataset")

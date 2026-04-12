@@ -58,7 +58,7 @@ def ensure_source_dataset(settings: Settings, logger) -> dict[str, Any]:
             "test_path": str(test_path),
         }
 
-    missing_files = [path.name for path in (train_path, test_path) if not path.exists()]
+    missing_files = [path.name for path in (train_path, test_path)]
     logger.warning("Часть исходных CSV отсутствует: %s", missing_files)
 
     if not settings.data.dataset_slug:

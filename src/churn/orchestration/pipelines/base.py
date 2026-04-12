@@ -23,9 +23,7 @@ class BasePipeline(ABC):
             "skip_eval": False,
         }
         if run_options:
-            self.run_options.update(
-                {key: bool(value) for key, value in run_options.items()}
-            )
+            self.run_options.update({key: bool(value) for key, value in run_options.items()})
 
         self.logger.debug(
             "Инициализирован %s: mode=%s, has_client=%s, run_options=%s",
@@ -64,11 +62,8 @@ class BasePipeline(ABC):
             finished_at = datetime.now()
             duration = finished_at - started_at
 
-            self.logger.info(
-                "=== Pipeline %s завершён успешно за %s ===",
-                self.pipeline_name,
-                duration,
-            )
+            self.logger.info("=== Pipeline %s завершён успешно за %s ===",
+                             self.pipeline_name, duration)
             self.logger.debug("Результат pipeline %s: %s", self.pipeline_name, result)
 
             return {
@@ -82,22 +77,15 @@ class BasePipeline(ABC):
             }
 
         except NotImplementedError:
-            self.logger.error(
-                "Pipeline %s не реализован: _run_impl() должен быть переопределён",
-                self.pipeline_name,
-            )
+            self.logger.error("Pipeline %s не реализован: _run_impl() должен быть переопределён", self.pipeline_name)
             raise
 
         except Exception as exc:
             finished_at = datetime.now()
             duration = finished_at - started_at
 
-            self.logger.exception(
-                "Pipeline %s завершился с ошибкой после %s: %s",
-                self.pipeline_name,
-                duration,
-                exc,
-            )
+            self.logger.exception("Pipeline %s завершился с ошибкой после %s: %s",
+                                  self.pipeline_name, duration, exc)
             raise
 
     @abstractmethod

@@ -3,7 +3,7 @@ from __future__ import annotations
 from src.churn.app.container import AppContainer
 from src.churn.app.settings import Settings
 from src.churn.infrastructure.config.loader import find_project_root, load_settings_dict
-from src.churn.infrastructure.execution.backend import resolve_backend
+from src.churn.infrastructure.execution.backend import resolve_backend  # Нахуй не нужен, можно юзать только runtime.mode
 from src.churn.infrastructure.execution.dask_client import create_dask_client
 from src.churn.infrastructure.logging.factory import build_logger
 from src.churn.infrastructure.storage.paths import ensure_project_dirs
