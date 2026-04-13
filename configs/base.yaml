@@ -41,7 +41,7 @@ model:
   early_stopping_rounds: 50
 
 preprocessing:
-  fillna_num: "median"
+  fillna_num: "mean"
   fillna_cat: "missing"
   target_encoding: true
   smoothing: 10

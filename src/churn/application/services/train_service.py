@@ -305,27 +305,6 @@ def train_pandas_model(settings: Settings, logger: Logger) -> dict[str, object]:
     }
 
 
-def train_dask_local_model(settings: Settings, logger: Logger, client) -> dict[str, object]:
-    """Временная заглушка для Dask local training.
-
-    Функция оставлена в модуле, чтобы не ломать импорт в DaskLocalPipeline
-    до реализации полноценного distributed обучения.
-
-    Args:
-        settings (Settings): Настройки приложения.
-        logger (Logger): Логгер для записи информации.
-        client: Активный Dask client.
-
-    Raises:
-        NotImplementedError: Dask local training пока не реализован.
-
-    Returns:
-        dict[str, object]: Эта функция не возвращает результат в текущей версии.
-    """
-    logger.error("train_dask_local_model пока не реализован")
-    raise NotImplementedError("Dask local training пока не реализован")
-
-
 def train_dask_local_model(
     settings: Settings,
     logger: Logger,

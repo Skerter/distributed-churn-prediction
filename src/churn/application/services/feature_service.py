@@ -385,7 +385,11 @@ def _build_dask_numeric_fill_values(train_ddf: dd.DataFrame, strategy: str,
         if strategy == "mean":
             tasks[column] = train_ddf[column].mean()
         elif strategy == "median":
-            tasks[column] = train_ddf[column].median()
+            logger.warning("Стратегия fillna_num=median неэффективна для Dask DataFrame. "
+                           "Рекомендуется использовать mean или выполнить fillna на pandas DataFrame.")
+            raise NotImplementedError("Dask не поддерживает эффективный способ вычисления медианы для больших DataFrame.")
+            # tasks[column] = train_ddf[column].median()
+            # TODO: Добавить поддержку медианы для Dask
             
     fill_values = dask.compute(tasks)[0]
     for column, value in fill_values.items():
