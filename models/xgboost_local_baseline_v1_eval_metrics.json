@@ -1,0 +1,21 @@
+{
+  "metrics": {
+    "roc_auc": 0.9313820115699338,
+    "pr_auc": 0.7030232364743684,
+    "logloss": 0.2511917274524751,
+    "precision_top_fraction": 0.7596904238347777,
+    "top_fraction": 0.1,
+    "top_k": 43058,
+    "threshold": 0.6937254071235657
+  },
+  "artifacts": {
+    "metrics_path": "C:\\vs_code_projects\\distributed-churn-prediction\\models\\xgboost_local_baseline_v1_eval_metrics.json",
+    "confusion_matrix_path": "C:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\confusion_matrix.png",
+    "roc_curve_path": "C:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\roc_curve.png",
+    "pr_curve_path": "C:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\pr_curve.png"
+  },
+  "validation": {
+    "rows": 430586,
+    "partitions": 4
+  }
+}

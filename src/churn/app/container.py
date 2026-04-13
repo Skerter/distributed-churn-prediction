@@ -12,42 +12,49 @@ from src.churn.shared.exceptions import PipelineResolutionError
 
 @dataclass(slots=True)
 class AppContainer:
-    '''Контейнер приложения, который инкапсулирует все зависимости и настройки, необходимые для работы приложения.
-    attrs:
-        settings (Settings): Настройки приложения, включая пути, параметры логирования и режим выполнения.
-        logger (logging.Logger): Логгер для записи информации о работе приложения.
-        backend (BackendKind): Тип бэкенда для выполнения (локальный или Dask).
-        dask_client (Any | None): Экземпляр Dask client для режимов Dask или None для режима pandas.
-        pipeline_registry (dict[str, str]): Реестр, сопоставляющий режимы выполнения с путями к классам pipeline.
-    '''
+    """Контейнер приложения, который управляет зависимостями и конфигурацией для построения и выполнения pipeline.
+
+    Raises:
+        PipelineResolutionError: Не удалось импортировать или создать экземпляр pipeline на основе зарегистрированного пути.
+        PipelineResolutionError: Не удалось создать экземпляр pipeline на основе зарегистрированного пути.
+
+    Returns:
+        Any: Экземпляр класса pipeline, соответствующий текущему режиму выполнения.
+    """
     settings: Settings
     logger: logging.Logger
-    backend: BackendKind
+    backend: BackendKind #TODO: бесполезно, нужно удалить и юзать только runtime.mode
     dask_client: Any | None
     pipeline_registry: dict[str, str]
 
     def get_pipeline_path(self) -> str:
-        """Получает путь к классу pipeline на основе текущего режима выполнения.
-        returns:
-            str: Дот-нотация пути к классу pipeline, например "src.churn.pipelines.pandas.PandasPipeline".
-        raises:
-            PipelineResolutionError: Если для текущего режима выполнения не зарегистрирован pipeline.
+        """Возвращает путь к pipeline на основе текущего режима выполнения.
+
+        Raises:
+            PipelineResolutionError: Если не удалось разрешить путь к pipeline на основе текущего режима выполнения.
+
+        Returns:
+            str: Путь к классу pipeline, зарегистрированному для текущего режима выполнения.
         """
         mode = self.settings.runtime.mode.value
 
         try:
             return self.pipeline_registry[mode]
         except KeyError as exc:
-            raise PipelineResolutionError(
-                f"Для режима {mode} не зарегистрирован pipeline"
-            ) from exc
+            raise PipelineResolutionError(f"Для режима {mode} не зарегистрирован pipeline") from exc
 
-    def build_pipeline(self) -> Any:
-        """Строит экземпляр pipeline на основе текущего режима выполнения, используя реестр pipeline и механизм динамического импорта.
-        returns:
+    def build_pipeline(self, run_options: dict[str, Any] | None = None) -> Any:
+        """Строит экземпляр pipeline на основе текущего режима выполнения и предоставленных опций запуска.
+
+        Args:
+            run_options (dict[str, Any] | None, optional): Опции пропуска этапов, флаги исполнения и профиль выполнения. По умолчанию None.
+
+        Raises:
+            PipelineResolutionError: Если не удалось импортировать или создать экземпляр pipeline на основе зарегистрированного пути.
+            PipelineResolutionError: Если не удалось создать экземпляр pipeline на основе зарегистрированного пути.
+
+        Returns:
             Any: Экземпляр класса pipeline, соответствующий текущему режиму выполнения.
-        raises:
-            PipelineResolutionError: Если не удалось разрешить или создать экземпляр pipeline для текущего режима выполнения.
         """
         dotted_path = self.get_pipeline_path()
 
@@ -65,6 +72,7 @@ class AppContainer:
                 config=self.settings,
                 logger=self.logger,
                 client=self.dask_client,
+                run_options=run_options,
             )
         except Exception as exc:
             raise PipelineResolutionError(

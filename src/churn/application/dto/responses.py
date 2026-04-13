@@ -4,6 +4,11 @@ from typing import Any
 
 @dataclass(slots=True)
 class HealthResponse:
+    """Класс ответа для проверки состояния приложения, который содержит информацию о состоянии здоровья приложения, включая имя приложения, версию, режим профиля, бэкенд и корневой путь проекта.
+
+    Returns:
+        HealthResponse: Экземпляр класса HealthResponse, содержащий информацию о состоянии здоровья приложения.
+    """
     app_name: str
     app_version: str
     profile_mode: str
@@ -22,6 +27,11 @@ class HealthResponse:
 
 @dataclass(slots=True)
 class RunPipelineResponse:
+    """Класс ответа для выполнения pipeline, который содержит информацию о результате выполнения, включая статус успеха, профиль, режим, бэкенд, путь к pipeline, флаг выполнения и сообщение.
+
+    Returns:
+        RunPipelineResponse: Экземпляр класса RunPipelineResponse, содержащий информацию о результате выполнения pipeline.
+    """
     success: bool
     profile: str
     mode: str

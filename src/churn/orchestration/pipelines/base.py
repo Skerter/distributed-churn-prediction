@@ -12,16 +12,25 @@ class BasePipeline(ABC):
     Общая обвязка: логирование, замер времени, обработка ошибок — живёт здесь.
     """
 
-    def __init__(self, config, logger, client=None) -> None:
+    def __init__(self, config, logger, client=None, run_options: dict[str, Any] | None = None) -> None:
         self.config = config
         self.logger = logger
         self.client = client
+        self.run_options = {
+            "skip_load": False,
+            "skip_features": False,
+            "skip_train": False,
+            "skip_eval": False,
+        }
+        if run_options:
+            self.run_options.update({key: bool(value) for key, value in run_options.items()})
 
         self.logger.debug(
-            "Инициализирован %s: mode=%s, has_client=%s",
+            "Инициализирован %s: mode=%s, has_client=%s, run_options=%s",
             self.__class__.__name__,
             getattr(self.config.runtime.mode, "value", self.config.runtime.mode),
             self.client is not None,
+            self.run_options,
         )
 
     @property
@@ -38,6 +47,7 @@ class BasePipeline(ABC):
         self.logger.debug("models_dir=%s", self.config.models_dir)
         self.logger.debug("logs_dir=%s", self.config.logs_dir)
         self.logger.debug("runtime_mode=%s", self.config.runtime.mode.value)
+        self.logger.debug("run_options=%s", self.run_options)
 
         if self.client is None:
             self.logger.info("Dask client отсутствует: pipeline работает без distributed client")
@@ -52,11 +62,8 @@ class BasePipeline(ABC):
             finished_at = datetime.now()
             duration = finished_at - started_at
 
-            self.logger.info(
-                "=== Pipeline %s завершён успешно за %s ===",
-                self.pipeline_name,
-                duration,
-            )
+            self.logger.info("=== Pipeline %s завершён успешно за %s ===",
+                             self.pipeline_name, duration)
             self.logger.debug("Результат pipeline %s: %s", self.pipeline_name, result)
 
             return {
@@ -70,22 +77,15 @@ class BasePipeline(ABC):
             }
 
         except NotImplementedError:
-            self.logger.error(
-                "Pipeline %s не реализован: _run_impl() должен быть переопределён",
-                self.pipeline_name,
-            )
+            self.logger.error("Pipeline %s не реализован: _run_impl() должен быть переопределён", self.pipeline_name)
             raise
 
         except Exception as exc:
             finished_at = datetime.now()
             duration = finished_at - started_at
 
-            self.logger.exception(
-                "Pipeline %s завершился с ошибкой после %s: %s",
-                self.pipeline_name,
-                duration,
-                exc,
-            )
+            self.logger.exception("Pipeline %s завершился с ошибкой после %s: %s",
+                                  self.pipeline_name, duration, exc)
             raise
 
     @abstractmethod

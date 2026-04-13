@@ -3,17 +3,19 @@ from __future__ import annotations
 from src.churn.app.container import AppContainer
 from src.churn.app.settings import Settings
 from src.churn.infrastructure.config.loader import find_project_root, load_settings_dict
-from src.churn.infrastructure.execution.backend import resolve_backend
+from src.churn.infrastructure.execution.backend import resolve_backend  # Нахуй не нужен, можно юзать только runtime.mode
 from src.churn.infrastructure.execution.dask_client import create_dask_client
 from src.churn.infrastructure.logging.factory import build_logger
 from src.churn.infrastructure.storage.paths import ensure_project_dirs
 
 
 def bootstrap(profile: str = "pandas") -> AppContainer:
-    """Инициализирует и настраивает все компоненты приложения, возвращая контейнер с готовыми к использованию объектами.
-    params:
-        profile (str): Профиль конфигурации, определяющий набор настроек для приложения (например, "pandas", "dask_local", "dask_k8s").
-    returns:
+    """Инициализирует и настраивает контейнер приложения, который управляет зависимостями и конфигурацией для построения и выполнения pipeline.
+
+    Args:
+        profile (str, optional): Профиль конфигурации, определяющий набор настроек для приложения. По умолчанию "pandas".
+
+    Returns:
         AppContainer: Контейнер, содержащий все инициализированные компоненты приложения, такие как настройки, логгер, бэкенд и Dask клиент.
     """
     project_root = find_project_root()
