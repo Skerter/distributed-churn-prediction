@@ -1,67 +1,317 @@
-# Distributed Churn Prediction Portfolio Project
+# Distributed Churn Prediction
 
-End-to-end ML-пайплайн для предсказания оттока клиентов (churn) на больших данных, фокус на scalability и MLOps. Демонстрирует переход от локального прототипа (Pandas/XGBoost) к распределённым вычислениям (Dask + Kubernetes) для обработки 2M+ строк.
+Проект по построению и постепенному масштабированию ML-пайплайна для задачи предсказания оттока клиентов.
 
-## Датасет
-- [Expresso Churn Prediction Challenge](https://kaggle.com/datasets/hamzaghanmi/expresso-churn-prediction-challenge) (2M строк train, дисбаланс CHURN ~5%).
-- Скачивание: Via kagglehub в `src/data/load_data.py`.
+Сейчас в репозитории есть две основные траектории выполнения:
+
+- **`pandas`** — локальный baseline-пайплайн на одной машине;
+- **`dask_local`** — локальный распределённый пайплайн через `Dask LocalCluster`;
+- **`dask_k8s`** — **в разработке**. В кодовой базе уже есть заготовки для подключения к внешнему Dask scheduler, но полноценный production-ready K8s pipeline ещё не завершён.
+
+---
+
+## Что делает проект
+
+Проект реализует полный ML workflow:
+
+1. проверяет наличие исходного датасета;
+2. при необходимости скачивает его через `kagglehub`;
+3. строит признаки и сохраняет обработанные данные в `parquet`;
+4. обучает модель XGBoost;
+5. оценивает качество модели и сохраняет метрики и графики.
+
+Основная идея проекта — пройти путь от локального baseline-решения к более реалистичной распределённой архитектуре, не теряя управляемость кода, конфигов и точек входа.
+
+---
+
+## Текущий статус
+
+| Профиль | Статус | Комментарий |
+|---|---|---|
+| `pandas` | Работает | Локальный baseline для feature engineering, training и evaluation |
+| `dask_local` | Работает / экспериментально | Распределённая локальная версия через Dask |
+| `dask_k8s` | В разработке | Нет завершённого end-to-end pipeline уровня production |
+
+---
+
+## Архитектура проекта
+
+Проект собран вокруг модульной структуры с разделением на уровни приложения:
+
+```text
+src/churn/
+├── app/
+│   ├── bootstrap.py
+│   ├── container.py
+│   └── settings.py
+├── application/
+│   ├── dto/
+│   ├── services/
+│   │   ├── dataset_service.py
+│   │   ├── evaluate_service.py
+│   │   ├── feature_service.py
+│   │   └── train_service.py
+│   └── use_cases/
+├── infrastructure/
+│   ├── config/
+│   ├── execution/
+│   ├── logging/
+│   └── storage/
+├── orchestration/
+│   └── pipelines/
+│       ├── base.py
+│       ├── pandas.py
+│       └── dask_local.py
+└── presentation/
+    └── cli/
+        ├── main.py
+        └── parser.py
+```
+
+### Роли слоёв
+
+- **`app/`** — bootstrap, контейнер зависимостей, агрегированные настройки.
+- **`application/services/`** — бизнес-логика по данным, признакам, обучению и оценке.
+- **`infrastructure/`** — загрузка конфигов, создание Dask client, логирование, файловые пути.
+- **`orchestration/pipelines/`** — сценарии выполнения шагов пайплайна.
+- **`presentation/cli/`** — CLI-интерфейс.
+
+Такое разделение удобно тем, что локальная и распределённая версии используют один и тот же общий каркас, а различается только реализация конкретных шагов.
+
+---
 
 ## Стек
-- Локальный: Python 3.11, Pandas 3.0.1, XGBoost 3.2.0, Scikit-learn 1.8.0.
-- Distributed: Dask (DataFrame/Array/ML), dask-xgboost, Docker (образы scheduler/workers), Kubernetes (minikube + Dask Operator для autoscaling).
-- Логи: coloredlogs.
-- Config: YAML для reproducibility.
 
-## Структура проекта
+- Python 3.11
+- Pandas
+- Dask / Distributed
+- XGBoost
+- Scikit-learn
+- PyArrow / Parquet
+- YAML-конфиги
+- `coloredlogs`
+- `kagglehub`
 
-**Описание структуры:**
-- **`configs/`** — содержит конфигурационные файлы (например, `config.yaml` с настройками проекта).
-- **`data/`** — разделён на `processed/` (обработанные данные) и `source/` (исходные данные).
-- **`logs/`** — хранит логи работы приложения для отладки и мониторинга.
-- **`models/`** — место хранения обученных моделей.
-- **`notebooks/`** — Jupyter-ноутбуки для анализа данных и визуализации (`EDA`, отчёты, графики).
-- **`src/`** — основной код проекта, структурированный по модулям:
-  - `data/` — загрузка и предварительная обработка данных;
-  - `evaluation/` — оценка качества моделей;
-  - `features/` — создание, преобразование и кодирование признаков;
-  - `models/` — обучение моделей;
-  - `utils/` — вспомогательные утилиты (логирование, работа с конфигурацией).
-- **`.gitignore`** — список файлов, которые не должны попадать в репозиторий.
-- **`environment.yml`** — файл с зависимостями окружения (например, для Conda).
-- **`main.py` и `main_local.py`** — точки входа в проект (основной и локальный запуск).
-- **`README.md`** — документация проекта с инструкциями и описанием.
+Для Kubernetes направления в окружении уже заложены зависимости, связанные с `dask-kubernetes`, но сам `dask_k8s` pipeline пока не доведён до готового сценария запуска.
 
-## Установка и запуск локального прототипа
-1. `conda env create -f environment.yml && conda activate dist-churn-pred-env`
-2. `python main_local.py` (full run: load → features → train → eval, ~10–15 мин)
-   - Опции: `--skip-load` (если данные есть), etc.
-3. Метрики: ROC-AUC 0.93, PR-AUC 0.70, Precision@top-10% 0.76.
+---
 
-## Ключевые этапы пайплайна
-- **Предобработка/Features**: Заполнение пропусков (median/missing), target encoding с smoothing=10, новые признаки (AVG_REVENUE, REGULARITY_SCORE). Сохранение в Parquet для Dask.
-- **Обучение**: XGBoost с CV=5 (StratifiedKFold), early stopping. Feature importance: REGULARITY top-1.
-- **Оценка**: Метрики на hold-out, графики (ROC/PR/Confusion) в notebooks/eval_plots/.
-- **Benchmarks**: Локальный runtime ~6 мин (single-core). Distributed target: <1 мин на K8s кластере (**Еще не реализовано**).
+## Данные
 
-## Результаты локального baseline
-| Метрика              | Значение | Insight |
-|----------------------|----------|---------|
-| ROC-AUC             | 0.9315  | Сильная discriminative power. |
-| PR-AUC              | 0.7047  | Хорошо для дисбаланса ~5% CHURN. |
-| LogLoss             | 0.2512  | Низкий, модель confident. |
-| Precision@top-10%   | 0.7608  | 76% churn в топ-рисковых — бизнес-lift для retention. |
+Источник данных: **Expresso Churn Prediction Challenge**.
 
-Графики: См. notebooks/eval_plots/ (ROC/PR curves).
+В конфиге используется slug датасета:
 
-Top features (из train.log):
-- REGULARITY: 0.45 (активность — ключевой churn-предиктор)
-- FREQUENCE_RECH: 0.15
-- REVENUE: 0.12
+```yaml
+data:
+  dataset_slug: "hamzaghanmi/expresso-churn-prediction-challenge"
+  train_filename: "Train.csv"
+  test_filename: "Test.csv"
+  target_column: "CHURN"
+```
 
-## Scalability Plan (Переход к Distributed)
-1. **Dask Features/Train**: Заменить Pandas на Dask DataFrame (read_parquet, groupby.agg для encoding), dask-xgboost.train для обучения. Distributed CV via HyperbandSearchCV.
-2. **Docker**: Образы для Dask scheduler/workers (с зависимостями: xgboost, pandas).
-3. **Kubernetes**: Minikube setup, deploy cluster (Dask Kubernetes Operator), autoscaling workers (3–12), dashboard для visuals (task graphs, CPU/memory).
-4. **Тюнинг**: Distributed hyperparam search (learning_rate, max_depth) на кластере.
-5. **Benchmarks**: Speedup x5–10, cost estimates (e.g., AWS EKS).
-6. **MLOps**: MLflow для tracking, Airflow для orchestration.
+При отсутствии локальных CSV пайплайн может попробовать скачать датасет автоматически.
+
+---
+
+## Конфигурация
+
+Базовые параметры задаются через YAML.
+
+Ключевые секции конфига:
+
+- `paths` — пути к данным, моделям, логам и артефактам;
+- `data` — параметры датасета и target-поля;
+- `logging` — уровень логирования и файловый вывод;
+- `runtime` — режим выполнения;
+- `dask` — настройки локального или внешнего scheduler;
+- `model`, `preprocessing`, `training`, `evaluation` — параметры ML-пайплайна.
+
+Пример важных параметров:
+
+```yaml
+model:
+  name: "xgboost"
+  version: "local_baseline_v1"
+  random_state: 42
+  test_size: 0.2
+  cv_folds: 5
+  early_stopping_rounds: 50
+
+preprocessing:
+  fillna_num: "mean"
+  fillna_cat: "missing"
+  target_encoding: true
+  smoothing: 10
+  categorical_columns:
+    - "REGION"
+    - "TENURE"
+    - "TOP_PACK"
+```
+
+---
+
+## Установка окружения
+
+### Linux / WSL
+
+```bash
+conda env create -f environment_linux.yml
+conda activate dist-churn-pred-env
+```
+
+### Windows
+
+```bash
+conda env create -f environment.yml
+conda activate dist-churn-pred-env
+```
+
+---
+
+## Запуск CLI
+
+Точка входа проекта — CLI.
+
+### Проверка состояния приложения
+
+```bash
+python -m src.churn.presentation.cli.main health --profile pandas
+```
+
+### Просмотр объединённого конфига
+
+```bash
+python -m src.churn.presentation.cli.main show-config --profile pandas
+```
+
+### Dry-run пайплайна
+
+```bash
+python -m src.churn.presentation.cli.main run-pipeline --profile pandas
+```
+
+### Реальный запуск pandas pipeline
+
+```bash
+python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute
+```
+
+### Реальный запуск dask_local pipeline
+
+```bash
+python -m src.churn.presentation.cli.main run-pipeline --profile dask_local --execute
+```
+
+### Запуск с пропуском отдельных шагов
+
+```bash
+python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute --skip-load
+python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute --skip-features
+python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute --skip-train
+python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute --skip-eval
+```
+
+Это полезно, когда часть артефактов уже существует и не нужно пересчитывать весь граф заново.
+
+---
+
+## Что создаётся в ходе работы
+
+### Исходные данные
+
+- `data/source/Train.csv`
+- `data/source/Test.csv`
+
+### Обработанные данные
+
+- `data/processed/train_processed.parquet`
+- `data/processed/test_processed.parquet`
+- `data/processed/target_encoding_maps.json`
+
+### Модели
+
+- pandas-режим: `models/xgboost_<version>.pkl`
+- dask_local-режим: `models/xgboost_<version>.json`
+
+### Метрики и графики
+
+- `models/*_eval_metrics.json`
+- `notebooks/eval_plots/confusion_matrix.png`
+- `notebooks/eval_plots/roc_curve.png`
+- `notebooks/eval_plots/pr_curve.png`
+
+---
+
+## Особенности профилей
+
+### `pandas`
+
+Подходит для:
+
+- baseline-реализации;
+- локальной отладки логики признаков;
+- проверки корректности оркестрации шагов;
+- быстрой итерации над кодом без Dask-кластера.
+
+### `dask_local`
+
+Подходит для:
+
+- проверки перехода с локального DataFrame на распределённый DataFrame;
+- тестирования поведения шагов на Dask API;
+- локального эксперимента с распределённым обучением через `xgboost.dask`.
+
+### `dask_k8s`
+
+Это направление пока не следует считать завершённым.
+
+На текущем этапе:
+
+- есть идея и конфигурационный задел;
+- есть поддержка подключения к внешнему scheduler;
+- нет завершённой end-to-end реализации, которую можно называть стабильной Kubernetes-версией проекта.
+
+Именно поэтому в документации ниже и во всём репозитории `dask_k8s` следует воспринимать как **WIP**.
+
+---
+
+## Ограничения текущей версии
+
+На данный момент важно учитывать несколько практических ограничений:
+
+1. **`dask_k8s` не завершён** — проект ещё не дошёл до стабильного распределённого запуска в Kubernetes.
+2. **Локальные baseline-метрики не стоит считать финальными production-метриками** — пайплайн ещё требует более строгой схемы валидации.
+3. **Часть артефактов сейчас генерируется прямо внутри репозитория** — для production-версии лучше вынести их в отдельное хранилище или каталоги, не попадающие в git.
+4. **Окружение очень чувствительно к версиям библиотек** — особенно в связке `dask`, `distributed`, `xgboost`, `pandas` и `dask-kubernetes`.
+
+---
+
+## Что стоит улучшить дальше
+
+Приоритетный roadmap проекта:
+
+1. убрать leakage в feature engineering и evaluation;
+2. разделить train/validation/test более строго;
+3. добавить автоматические тесты;
+4. стабилизировать `dask_local`;
+5. довести до конца `dask_k8s` профиль;
+6. вынести артефакты и тяжёлые файлы из git;
+7. добавить CI-проверки и smoke tests для CLI.
+
+---
+
+## Кому будет полезен проект
+
+Этот репозиторий полезен как учебный и инженерный проект, если хочется понять:
+
+- как спроектировать ML-пайплайн с несколькими backend-профилями;
+- как плавно перейти от `pandas` к `dask`;
+- как организовать код вокруг конфигов, orchestration и CLI;
+- как подготовить архитектурную базу под дальнейший запуск в Kubernetes.
+
+---
+
+## Важное замечание
+
+`dask_k8s` версия **ещё в разработке**. Если нужен стабильный сценарий запуска прямо сейчас, ориентироваться стоит на `pandas` и `dask_local`.
