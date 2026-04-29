@@ -9,10 +9,10 @@
     "threshold": 0.6937254071235657
   },
   "artifacts": {
-    "metrics_path": "C:\\vs_code_projects\\distributed-churn-prediction\\models\\xgboost_local_baseline_v1_eval_metrics.json",
-    "confusion_matrix_path": "C:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\confusion_matrix.png",
-    "roc_curve_path": "C:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\roc_curve.png",
-    "pr_curve_path": "C:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\pr_curve.png"
+    "metrics_path": "D:\\vs_code_projects\\distributed-churn-prediction\\models\\xgboost_local_baseline_v1_eval_metrics.json",
+    "confusion_matrix_path": "D:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\confusion_matrix.png",
+    "roc_curve_path": "D:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\roc_curve.png",
+    "pr_curve_path": "D:\\vs_code_projects\\distributed-churn-prediction\\notebooks\\eval_plots\\pr_curve.png"
   },
   "validation": {
     "rows": 430586,
