@@ -20,7 +20,6 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-from sklearn.model_selection import train_test_split
 from xgboost.dask import predict
 
 from src.churn.app.settings import Settings
@@ -154,12 +153,14 @@ def evaluate_pandas_model(settings: Settings, logger: Logger) -> dict[str, Any]:
     Returns:
         dict[str, Any]: Метрики и пути к сохранённым артефактам.
     """
-    train_processed_path = settings.data_processed_dir / "train_processed.parquet"
+    valid_processed_path = settings.data_processed_dir / "valid_processed.parquet"
     model_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}.pkl"
 
-    if not train_processed_path.exists():
-        logger.error("Не найден parquet для оценки: %s", train_processed_path)
-        raise FileNotFoundError(f"Не найден parquet для оценки: {train_processed_path}")
+    if not valid_processed_path.exists():
+        logger.error("Не найден valid parquet для оценки: %s", valid_processed_path)
+        raise FileNotFoundError(
+            f"Не найден valid parquet для оценки: {valid_processed_path}"
+        )
 
     if not model_path.exists():
         logger.error("Не найдена модель для оценки: %s", model_path)
@@ -173,24 +174,20 @@ def evaluate_pandas_model(settings: Settings, logger: Logger) -> dict[str, Any]:
     roc_curve_path = eval_plots_dir / "roc_curve.png"
     pr_curve_path = eval_plots_dir / "pr_curve.png"
 
-    logger.info("Старт оценки pandas-модели")
-    logger.debug("train_processed_path=%s", train_processed_path)
+    logger.info("Старт оценки pandas-модели на validation set")
+    logger.debug("valid_processed_path=%s", valid_processed_path)
     logger.debug("model_path=%s", model_path)
 
-    df = pd.read_parquet(train_processed_path)
+    valid_df = pd.read_parquet(valid_processed_path)
     model = joblib.load(model_path)
 
-    X, y = prepare_features_target(df, settings, logger)
+    X_val, y_val = prepare_features_target(valid_df, settings, logger)
 
-    _, X_val, _, y_val = train_test_split(
-        X,
-        y,
-        test_size=settings.model.test_size,
-        stratify=y,
-        random_state=settings.model.random_state,
+    logger.info(
+        "Validation set загружен: X_val=%s y_val=%s",
+        X_val.shape,
+        y_val.shape,
     )
-
-    logger.info("Сформирован hold-out для оценки: X_val=%s y_val=%s", X_val.shape, y_val.shape)
 
     y_pred_proba = model.predict_proba(X_val)[:, 1]
     y_pred = model.predict(X_val)
@@ -204,7 +201,7 @@ def evaluate_pandas_model(settings: Settings, logger: Logger) -> dict[str, Any]:
     y_pred_top = (y_pred_proba >= threshold).astype(int)
     precision_top = float(precision_score(y_val, y_pred_top, zero_division=0))
 
-    logger.info("Метрики hold-out:")
+    logger.info("Метрики validation:")
     logger.info("ROC-AUC: %.6f", roc_auc)
     logger.info("PR-AUC: %.6f", pr_auc)
     logger.info("LogLoss: %.6f", logloss)
@@ -241,6 +238,7 @@ def evaluate_pandas_model(settings: Settings, logger: Logger) -> dict[str, Any]:
             "pr_curve_path": str(pr_curve_path),
         },
         "validation": {
+            "source": str(valid_processed_path),
             "rows": int(len(y_val)),
         },
     }

@@ -7,7 +7,7 @@ import joblib
 import pandas as pd
 import dask.dataframe as dd
 from dask.distributed import wait
-from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from xgboost import XGBClassifier
 from xgboost.dask import DaskXGBClassifier
 
@@ -222,15 +222,8 @@ def _fit_pandas_final_model(
 
 def train_pandas_model(settings: Settings, logger: Logger) -> dict[str, object]:
     """Выполняет полный сценарий обучения pandas-модели.
-
-    Сценарий шага:
-    1. Загружаем обработанный parquet
-    2. Подготавливаем X/y
-    3. Считаем CV
-    4. Делаем train/validation split
-    5. Обучаем финальную модель
-    6. Сохраняем модель
-    7. Возвращаем summary по обучению
+    CV здесь намеренно не запускается, потому что обычная CV поверх заранее
+    target-encoded train-part всё ещё даёт оптимистичную оценку.
 
     Args:
         settings (Settings): Настройки приложения.
@@ -243,41 +236,46 @@ def train_pandas_model(settings: Settings, logger: Logger) -> dict[str, object]:
         dict[str, object]: Сводка по обучению модели.
     """
     train_processed_path = settings.data_processed_dir / "train_processed.parquet"
+    valid_processed_path = settings.data_processed_dir / "valid_processed.parquet"
     model_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}.pkl"
 
-    logger.info("Старт pandas-обучения")
+    logger.info("Старт pandas-обучения на split")
     logger.debug("train_processed_path=%s", train_processed_path)
+    logger.debug("valid_processed_path=%s", valid_processed_path)
     logger.debug("model_path=%s", model_path)
 
     if not train_processed_path.exists():
-        logger.error("Не найден parquet для обучения: %s", train_processed_path)
-        raise FileNotFoundError(f"Не найден parquet для обучения: {train_processed_path}")
+        logger.error("Не найден train parquet для обучения: %s", train_processed_path)
+        raise FileNotFoundError(
+            f"Не найден train parquet для обучения: {train_processed_path}"
+        )
 
-    df = pd.read_parquet(train_processed_path)
-    logger.info("Данные загружены: rows=%s cols=%s", df.shape[0], df.shape[1])
+    if not valid_processed_path.exists():
+        logger.error("Не найден valid parquet для early stopping: %s", valid_processed_path)
+        raise FileNotFoundError(
+            f"Не найден valid parquet для early stopping: {valid_processed_path}"
+        )
 
-    X, y = prepare_features_target(df, settings, logger)
-
-    logger.debug("Матрица признаков: rows=%s cols=%s", X.shape[0], X.shape[1])
-    logger.debug("Доля положительного класса: %.6f", y.mean())
-
-    cv_result = _run_pandas_cross_validation(X, y, settings, logger)
-
-    logger.info("Подготовка финального train/validation split: test_size=%.3f", settings.model.test_size)
-    X_train, X_val, y_train, y_val = train_test_split(
-        X,
-        y,
-        test_size=settings.model.test_size,
-        stratify=y,
-        random_state=settings.model.random_state,
-    )
+    train_df = pd.read_parquet(train_processed_path)
+    valid_df = pd.read_parquet(valid_processed_path)
 
     logger.info(
-        "Split завершён: X_train=%s X_val=%s y_train=%s y_val=%s",
-        X_train.shape,
-        X_val.shape,
-        y_train.shape,
-        y_val.shape,
+        "Данные загружены: train_shape=%s, valid_shape=%s",
+        train_df.shape,
+        valid_df.shape,
+    )
+
+    X_train, y_train = prepare_features_target(train_df, settings, logger)
+    X_val, y_val = prepare_features_target(valid_df, settings, logger)
+
+    logger.debug("X_train_shape=%s, y_train_shape=%s", X_train.shape, y_train.shape)
+    logger.debug("X_val_shape=%s, y_val_shape=%s", X_val.shape, y_val.shape)
+    logger.debug("train target rate=%.6f", y_train.mean())
+    logger.debug("valid target rate=%.6f", y_val.mean())
+
+    logger.warning(
+        "Pandas CV отключена: обычная CV после target encoding может давать leakage. "
+        "Основная честная метрика считается на valid_processed.parquet."
     )
 
     model = _fit_pandas_final_model(
@@ -299,9 +297,16 @@ def train_pandas_model(settings: Settings, logger: Logger) -> dict[str, object]:
         "model_path": str(model_path),
         "train_rows": int(X_train.shape[0]),
         "val_rows": int(X_val.shape[0]),
-        "cv_roc_auc_mean": cv_result["cv_roc_auc_mean"],
-        "cv_roc_auc_std": cv_result["cv_roc_auc_std"],
+        "train_target_rate": float(y_train.mean()),
+        "val_target_rate": float(y_val.mean()),
+        "cv_roc_auc_mean": None,
+        "cv_roc_auc_std": None,
+        "cv_note": (
+            "CV disabled because target encoding was fitted before CV folds. "
+            "Use validation metrics from valid_processed.parquet."
+        ),
         "best_iteration": int(best_iteration) if best_iteration is not None else None,
+        "validation_source": str(valid_processed_path),
     }
 
 
