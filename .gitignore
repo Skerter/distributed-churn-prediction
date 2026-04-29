@@ -1,5 +1,5 @@
 # project ignore
-vscode/
+.vscode/
 .data/
 notebooks/reports/
 logs/

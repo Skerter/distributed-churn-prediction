@@ -11,6 +11,7 @@ import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from dask.distributed import wait
+from sklearn.model_selection import train_test_split
 
 from src.churn.app.settings import Settings
 
@@ -146,7 +147,7 @@ def _create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return result
 
-
+# Неактуальная версия, оставил для сравнения
 def _target_encode(train_df: pd.DataFrame, test_df: pd.DataFrame,categorical_columns: list[str],
                    target_column: str, smoothing: float, logger) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, dict[str, float]]]:
     """Применяет target encoding к указанным категориальным колонкам.
@@ -188,6 +189,75 @@ def _target_encode(train_df: pd.DataFrame, test_df: pd.DataFrame,categorical_col
     return train_result, test_result, mappings
 
 
+def _target_encode_many(
+    fit_df: pd.DataFrame,
+    frames: dict[str, pd.DataFrame],
+    categorical_columns: list[str],
+    target_column: str,
+    smoothing: float,
+    logger: Logger,
+) -> tuple[dict[str, pd.DataFrame], dict[str, Any]]:
+    """Выполняет target encoding для нескольких DataFrame на основе одного fit_df.
+
+    Args:
+        fit_df (pd.DataFrame): DataFrame, на котором считаются статистики для target encoding
+        frames (dict[str, pd.DataFrame]): Словарь с DataFrame для применения target encoding
+        categorical_columns (list[str]): Список категориальных колонок
+        target_column (str): Название целевой колонки
+        smoothing (float): Параметр сглаживания
+        logger (Logger): Логгер для записи информации
+
+    Returns:
+        tuple[dict[str, pd.DataFrame], dict[str, Any]]: Кортеж из словаря с обновленными DataFrame и словаря с состоянием encoder-а для сохранения в JSON
+    """
+    result_frames = {name: frame.copy() for name, frame in frames.items()}
+
+    prior = float(fit_df[target_column].mean())
+    logger.debug("Target encoding prior=%.6f", prior)
+
+    mappings: dict[str, dict[str, float]] = {}
+
+    for column in categorical_columns:
+        logger.info("Target encoding колонки %s", column)
+
+        stats = fit_df.groupby(column)[target_column].agg(["mean", "count"])
+        smoothed = (
+            stats["count"] * stats["mean"] + smoothing * prior
+        ) / (stats["count"] + smoothing)
+
+        runtime_mapping = smoothed.to_dict()
+        mappings[column] = {
+            str(key): float(value)
+            for key, value in runtime_mapping.items()
+        }
+
+        for frame_name, frame in result_frames.items():
+            if column not in frame.columns:
+                continue
+
+            frame[column] = (
+                frame[column]
+                .map(runtime_mapping)
+                .fillna(prior)
+                .astype("float64")
+            )
+
+            logger.debug(
+                "%s: колонка %s target-encoded, mapping_size=%s",
+                frame_name,
+                column,
+                len(runtime_mapping),
+            )
+
+    encoder_state = {
+        "prior": prior,
+        "target_column": target_column,
+        "categorical_columns": categorical_columns,
+        "mappings": mappings,
+    }
+
+    return result_frames, encoder_state
+
 def _save_json(path: Path, payload: dict[str, Any]) -> None:
     """Сохраняет словарь в JSON файл.
 
@@ -215,9 +285,11 @@ def run_pandas_feature_engineering(settings: Settings, logger: Logger) -> dict[s
     logger.debug("Сборка путей к данным для pandas feature engineering")
 
     source_dir = settings.data_source_dir
+    processed_dir = settings.data_processed_dir
+
     train_path = source_dir / settings.data.train_filename
     test_path = source_dir / settings.data.test_filename
-    
+
     if not train_path.exists():
         logger.error("Train CSV не найден: %s", train_path)
         raise FileNotFoundError(f"Не найден train dataset: {train_path}")
@@ -225,79 +297,162 @@ def run_pandas_feature_engineering(settings: Settings, logger: Logger) -> dict[s
     if not test_path.exists():
         logger.error("Test CSV не найден: %s", test_path)
         raise FileNotFoundError(f"Не найден test dataset: {test_path}")
-    
-    processed_dir = settings.data_processed_dir
+
     maps_path = processed_dir / "target_encoding_maps.json"
     train_processed_path = processed_dir / "train_processed.parquet"
+    valid_processed_path = processed_dir / "valid_processed.parquet"
     test_processed_path = processed_dir / "test_processed.parquet"
 
     logger.info("Старт feature engineering для pandas")
     logger.debug("train_path=%s", train_path)
     logger.debug("test_path=%s", test_path)
     logger.debug("train_processed_path=%s", train_processed_path)
+    logger.debug("valid_processed_path=%s", valid_processed_path)
     logger.debug("test_processed_path=%s", test_processed_path)
     logger.debug("maps_path=%s", maps_path)
 
-    df_train = pd.read_csv(train_path)
-    df_test = pd.read_csv(test_path)
+    raw_train_df = pd.read_csv(train_path)
+    test_df = pd.read_csv(test_path)
 
-    logger.info("CSV загружены: train_shape=%s, test_shape=%s", df_train.shape, df_test.shape)
+    logger.info(
+        "CSV загружены: raw_train_shape=%s, test_shape=%s",
+        raw_train_df.shape,
+        test_df.shape,
+    )
 
     categorical_columns = list(settings.preprocessing.categorical_columns)
     target_column = settings.data.target_column
 
-    _validate_columns(df_train, categorical_columns + FEATURE_REQUIRED_COLUMNS + [target_column], "train")
-    _validate_columns(df_test, categorical_columns + FEATURE_REQUIRED_COLUMNS, "test")
+    _validate_columns(
+        raw_train_df,
+        categorical_columns + FEATURE_REQUIRED_COLUMNS + [target_column],
+        "raw_train",
+    )
+    _validate_columns(
+        test_df,
+        categorical_columns + FEATURE_REQUIRED_COLUMNS,
+        "test",
+    )
 
-    fill_values = _build_numeric_fill_values(train_df=df_train, strategy=settings.preprocessing.fillna_num,
-                                             target_column=target_column)
-    logger.debug("Сформированы fill values для числовых колонок: %s", fill_values)
+    train_df, valid_df = train_test_split(
+        raw_train_df,
+        test_size=settings.model.test_size,
+        stratify=raw_train_df[target_column],
+        random_state=settings.model.random_state,
+    )
 
-    df_train = _fill_numeric_na(df_train, fill_values, logger, "train")
-    df_test = _fill_numeric_na(df_test, fill_values, logger, "test")
+    train_df = train_df.copy()
+    valid_df = valid_df.copy()
+    test_df = test_df.copy()
 
-    df_train = _fill_categorical_na(df_train, categorical_columns,
-                                    settings.preprocessing.fillna_cat, logger, "train")
-    df_test = _fill_categorical_na(df_test, categorical_columns, 
-                                   settings.preprocessing.fillna_cat, logger, "test")
+    logger.info(
+        "Train/validation split выполнен до preprocessing: train_shape=%s, valid_shape=%s",
+        train_df.shape,
+        valid_df.shape,
+    )
+
+    fill_values = _build_numeric_fill_values(
+        train_df=train_df,
+        strategy=settings.preprocessing.fillna_num,
+        target_column=target_column,
+    )
+
+    logger.debug("Fill values построены только по train-part: %s", fill_values)
+
+    train_df = _fill_numeric_na(train_df, fill_values, logger, "train")
+    valid_df = _fill_numeric_na(valid_df, fill_values, logger, "valid")
+    test_df = _fill_numeric_na(test_df, fill_values, logger, "test")
+
+    train_df = _fill_categorical_na(
+        train_df,
+        categorical_columns,
+        settings.preprocessing.fillna_cat,
+        logger,
+        "train",
+    )
+    valid_df = _fill_categorical_na(
+        valid_df,
+        categorical_columns,
+        settings.preprocessing.fillna_cat,
+        logger,
+        "valid",
+    )
+    test_df = _fill_categorical_na(
+        test_df,
+        categorical_columns,
+        settings.preprocessing.fillna_cat,
+        logger,
+        "test",
+    )
 
     logger.info("Заполнение пропусков завершено")
 
-    df_train = _create_features(df_train)
-    df_test = _create_features(df_test)
-    logger.info("Созданы новые признаки: AVG_REVENUE, RECH_TO_DATA_RATIO, "
-                "REGULARITY_SCORE, HAS_TOP_PACK, MISSING_ZONE")
+    train_df = _create_features(train_df)
+    valid_df = _create_features(valid_df)
+    test_df = _create_features(test_df)
+
+    logger.info(
+        "Созданы новые признаки: AVG_REVENUE, RECH_TO_DATA_RATIO, "
+        "REGULARITY_SCORE, HAS_TOP_PACK, MISSING_ZONE"
+    )
 
     if settings.preprocessing.target_encoding:
-        logger.info("Включён target encoding для колонок: %s", categorical_columns)
-        df_train, df_test, mappings = _target_encode(
-            train_df=df_train,
-            test_df=df_test,
+        logger.info(
+            "Включён target encoding для колонок: %s",
+            categorical_columns,
+        )
+
+        encoded_frames, encoder_state = _target_encode_many(
+            fit_df=train_df,
+            frames={
+                "train": train_df,
+                "valid": valid_df,
+                "test": test_df,
+            },
             categorical_columns=categorical_columns,
             target_column=target_column,
             smoothing=settings.preprocessing.smoothing,
             logger=logger,
         )
-        _save_json(maps_path, mappings)
+
+        train_df = encoded_frames["train"]
+        valid_df = encoded_frames["valid"]
+        test_df = encoded_frames["test"]
+
+        _save_json(maps_path, encoder_state)
         logger.info("Маппинги target encoding сохранены: %s", maps_path)
     else:
         logger.warning("Target encoding отключён конфигом")
-        mappings = {}
+        encoder_state = {}
+    
+    _cleanup_output_path(train_processed_path)
+    _cleanup_output_path(valid_processed_path)
+    _cleanup_output_path(test_processed_path)
 
-    df_train.to_parquet(train_processed_path, index=False)
-    df_test.to_parquet(test_processed_path, index=False)
+    train_df.to_parquet(train_processed_path, index=False)
+    valid_df.to_parquet(valid_processed_path, index=False)
+    test_df.to_parquet(test_processed_path, index=False)
 
     logger.info("Обработанные parquet сохранены")
     logger.debug("train_processed_path=%s", train_processed_path)
+    logger.debug("valid_processed_path=%s", valid_processed_path)
     logger.debug("test_processed_path=%s", test_processed_path)
 
     return {
-        "train_shape": list(df_train.shape),
-        "test_shape": list(df_test.shape),
+        "train_shape": list(train_df.shape),
+        "valid_shape": list(valid_df.shape),
+        "test_shape": list(test_df.shape),
         "artifacts": {
             "train_processed_path": str(train_processed_path),
+            "valid_processed_path": str(valid_processed_path),
             "test_processed_path": str(test_processed_path),
-            "encoding_maps_path": str(maps_path) if mappings else None,
+            "encoding_maps_path": str(maps_path) if encoder_state else None,
+        },
+        "split": {
+            "test_size": float(settings.model.test_size),
+            "random_state": int(settings.model.random_state),
+            "stratified_by": target_column,
+            "leakage_safe": True,
         },
         "feature_flags": {
             "target_encoding": settings.preprocessing.target_encoding,
