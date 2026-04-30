@@ -1,9 +1,12 @@
 # project ignore
 .vscode/
 .data/
-notebooks/reports/
+notebooks/eval_plots/
 logs/
 archive/
+data/processed/*.json
+models/*.json
+
 
 *.csv
 *.parquet
