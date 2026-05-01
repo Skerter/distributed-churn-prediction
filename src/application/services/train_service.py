@@ -319,8 +319,8 @@ def train_dask_local_model(
 
     Сценарий шага:
     1. Загружаем train/validation parquet через Dask
-    2. Подготавливаем Dask X/y
-    3. Materialize train/validation в памяти кластера через persist
+    2. Materialize цельные train/validation DataFrame в памяти кластера
+    3. Подготавливаем Dask X/y из materialized DataFrame
     4. Обучаем DaskXGBClassifier с early stopping
     5. Сохраняем booster-модель
     6. Возвращаем summary по distributed обучению
@@ -345,7 +345,7 @@ def train_dask_local_model(
     valid_processed_path = settings.data_processed_dir / "valid_processed.parquet"
     model_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}.json"
 
-    logger.info("Старт Dask local обучения")
+    logger.info("Старт Dask local обучения на leakage-safe split")
     logger.debug("train_processed_path=%s", train_processed_path)
     logger.debug("valid_processed_path=%s", valid_processed_path)
     logger.debug("model_path=%s", model_path)
@@ -373,14 +373,21 @@ def train_dask_local_model(
     logger.debug("train_columns=%s", list(train_ddf.columns))
     logger.debug("valid_columns=%s", list(valid_ddf.columns))
 
+    logger.info("Materialize цельных train/validation DataFrame перед XGBoost")
+    train_ddf, valid_ddf = client.persist([train_ddf, valid_ddf])
+    wait([train_ddf, valid_ddf])
+
     X_train, y_train = prepare_dask_features_target(train_ddf, settings, logger)
     X_val, y_val = prepare_dask_features_target(valid_ddf, settings, logger)
 
-    logger.info("Persist train/validation наборов в памяти кластера")
-    X_train, y_train, X_val, y_val = client.persist(
-        [X_train, y_train, X_val, y_val]
+    logger.info(
+        "Dask X/y подготовлены: X_train_partitions=%s y_train_partitions=%s "
+        "X_val_partitions=%s y_val_partitions=%s",
+        X_train.npartitions,
+        y_train.npartitions,
+        X_val.npartitions,
+        y_val.npartitions,
     )
-    wait([X_train, y_train, X_val, y_val])
 
     train_rows = int(y_train.map_partitions(len).sum().compute())
     val_rows = int(y_val.map_partitions(len).sum().compute())
@@ -400,7 +407,7 @@ def train_dask_local_model(
         val_target_rate = None
 
     logger.info(
-        "Leakage-safe split материализован: train_rows=%s val_rows=%s",
+        "Leakage-safe split готов: train_rows=%s val_rows=%s",
         train_rows,
         val_rows,
     )
@@ -428,6 +435,9 @@ def train_dask_local_model(
     booster.save_model(model_path)
     logger.info("Booster сохранён: %s", model_path)
 
+    logger.debug("Освобождаем persisted train/validation DataFrame")
+    client.cancel([train_ddf, valid_ddf], force=True)
+
     return {
         "model_path": str(model_path),
         "train_rows": int(train_rows),
@@ -438,4 +448,5 @@ def train_dask_local_model(
         "val_target_rate": val_target_rate,
         "best_iteration": int(best_iteration) if best_iteration is not None else None,
         "validation_source": str(valid_processed_path),
+        "leakage_safe": True,
     }

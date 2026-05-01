@@ -921,6 +921,16 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
     train_rows = _count_dask_rows(train_ddf)
     valid_rows = _count_dask_rows(valid_ddf)
     test_rows = _count_dask_rows(test_ddf)
+    
+    logger.info(
+        "Dask feature engineering завершён успешно: train_rows=%s, valid_rows=%s, test_rows=%s",
+        train_rows,
+        valid_rows,
+        test_rows,
+    )
+
+    logger.debug("Освобождаем persisted Dask feature engineering collections")
+    client.cancel([train_ddf, valid_ddf, test_ddf], force=True)
 
     logger.info(
         "Dask feature engineering завершён успешно: train_rows=%s, valid_rows=%s, test_rows=%s",

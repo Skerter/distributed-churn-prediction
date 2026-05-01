@@ -259,12 +259,11 @@ def evaluate_dask_local_model(
     Сценарий шага:
     1. Загружаем заранее подготовленный validation parquet через Dask
     2. Подготавливаем Dask X/y
-    3. Materialize validation в памяти кластера через persist
-    4. Загружаем booster из JSON
-    5. Получаем distributed предсказания
-    6. Материализуем предсказания и target в numpy
-    7. Считаем метрики
-    8. Сохраняем plots и metrics JSON
+    3. Загружаем booster из JSON
+    4. Получаем distributed предсказания
+    5. Материализуем предсказания и target в numpy
+    6. Считаем метрики
+    7. Сохраняем plots и metrics JSON
 
     Args:
         settings (Settings): Настройки приложения.
@@ -317,14 +316,10 @@ def evaluate_dask_local_model(
 
     X_val, y_val = prepare_dask_features_target(valid_ddf, settings, logger)
 
-    logger.info("Persist validation набора в памяти кластера")
-    X_val, y_val = client.persist([X_val, y_val])
-    wait([X_val, y_val])
-
     val_rows = int(y_val.map_partitions(len).sum().compute())
 
     logger.info(
-        "Validation набор materialized: rows=%s partitions=%s",
+        "Validation набор готов: rows=%s partitions=%s",
         val_rows,
         X_val.npartitions,
     )
