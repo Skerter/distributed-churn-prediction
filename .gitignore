@@ -1,14 +1,38 @@
-# project ignore
+# ======================
+# Project local files
+# ======================
+
+# IDE / editor settings
 .vscode/
-.data/
-notebooks/reports/
+.idea/
+
+# Logs
 logs/
+*.log
+
+# Local archives
 archive/
 
+# Datasets
+data/source/
+data/processed/
 *.csv
 *.parquet
+
+# Model artifacts
+models/
 *.pkl
-*.log
+*.joblib
+*.json
+
+# Generated plots
+notebooks/eval_plots/
+notebooks/model_plots/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
