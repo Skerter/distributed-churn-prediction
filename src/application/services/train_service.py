@@ -310,7 +310,7 @@ def train_pandas_model(settings: Settings, logger: Logger) -> dict[str, object]:
     }
 
 
-def train_dask_local_model(
+def train_dask_model(
     settings: Settings,
     logger: Logger,
     client,
