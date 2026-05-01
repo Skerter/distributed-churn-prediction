@@ -257,13 +257,13 @@ def evaluate_dask_local_model(
     """Оценивает модель в режиме dask_local на hold-out выборке.
 
     Сценарий шага:
-    1. Загружаем обработанный parquet через Dask
-    2. Делаем тот же distributed split, что и в train
-    3. Берём validation-часть и подготавливаем Dask X/y
-    4. Materialize validation в памяти кластера через persist
-    5. Загружаем booster из JSON
-    6. Получаем distributed предсказания
-    7. Материализуем их в numpy и считаем метрики
+    1. Загружаем заранее подготовленный validation parquet через Dask
+    2. Подготавливаем Dask X/y
+    3. Materialize validation в памяти кластера через persist
+    4. Загружаем booster из JSON
+    5. Получаем distributed предсказания
+    6. Материализуем предсказания и target в numpy
+    7. Считаем метрики
     8. Сохраняем plots и metrics JSON
 
     Args:
@@ -273,7 +273,7 @@ def evaluate_dask_local_model(
 
     Raises:
         RuntimeError: Если оценка вызвана без Dask client.
-        FileNotFoundError: Если не найдены parquet или модель.
+        FileNotFoundError: Если не найдены validation parquet или модель.
 
     Returns:
         dict[str, Any]: Метрики и пути к сохранённым артефактам.
@@ -282,12 +282,14 @@ def evaluate_dask_local_model(
         logger.error("evaluate_dask_local_model вызван без Dask client")
         raise RuntimeError("Для Dask local evaluation требуется активный Dask client")
 
-    train_processed_path = settings.data_processed_dir / "train_processed.parquet"
+    valid_processed_path = settings.data_processed_dir / "valid_processed.parquet"
     model_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}.json"
 
-    if not train_processed_path.exists():
-        logger.error("Не найден parquet для оценки: %s", train_processed_path)
-        raise FileNotFoundError(f"Не найден parquet для оценки: {train_processed_path}")
+    if not valid_processed_path.exists():
+        logger.error("Не найден valid parquet для оценки: %s", valid_processed_path)
+        raise FileNotFoundError(
+            f"Не найден valid parquet для оценки: {valid_processed_path}"
+        )
 
     if not model_path.exists():
         logger.error("Не найдена модель для оценки: %s", model_path)
@@ -301,34 +303,26 @@ def evaluate_dask_local_model(
     roc_curve_path = eval_plots_dir / "roc_curve.png"
     pr_curve_path = eval_plots_dir / "pr_curve.png"
 
-    logger.info("Старт оценки Dask local модели")
-    logger.debug("train_processed_path=%s", train_processed_path)
+    logger.info("Старт оценки Dask local модели на validation set")
+    logger.debug("valid_processed_path=%s", valid_processed_path)
     logger.debug("model_path=%s", model_path)
 
-    ddf = dd.read_parquet(train_processed_path)
-    logger.info(
-        "Dask parquet загружен: partitions=%s columns=%s",
-        ddf.npartitions,
-        list(ddf.columns),
-    )
+    valid_ddf = dd.read_parquet(valid_processed_path)
 
     logger.info(
-        "Подготовка distributed validation split: train_size=%.3f val_size=%.3f",
-        1.0 - settings.model.test_size,
-        settings.model.test_size,
-    )
-    _, val_ddf = ddf.random_split(
-        [1.0 - settings.model.test_size, settings.model.test_size],
-        random_state=settings.model.random_state,
+        "Dask validation parquet загружен: partitions=%s columns=%s",
+        valid_ddf.npartitions,
+        list(valid_ddf.columns),
     )
 
-    X_val, y_val = prepare_dask_features_target(val_ddf, settings, logger)
+    X_val, y_val = prepare_dask_features_target(valid_ddf, settings, logger)
 
     logger.info("Persist validation набора в памяти кластера")
     X_val, y_val = client.persist([X_val, y_val])
     wait([X_val, y_val])
 
     val_rows = int(y_val.map_partitions(len).sum().compute())
+
     logger.info(
         "Validation набор materialized: rows=%s partitions=%s",
         val_rows,
@@ -355,7 +349,7 @@ def evaluate_dask_local_model(
     y_pred_top = (y_pred_proba_np >= threshold).astype(int)
     precision_top = float(precision_score(y_val_np, y_pred_top, zero_division=0))
 
-    logger.info("Метрики hold-out:")
+    logger.info("Метрики validation:")
     logger.info("ROC-AUC: %.6f", roc_auc)
     logger.info("PR-AUC: %.6f", pr_auc)
     logger.info("LogLoss: %.6f", logloss)
@@ -392,6 +386,7 @@ def evaluate_dask_local_model(
             "pr_curve_path": str(pr_curve_path),
         },
         "validation": {
+            "source": str(valid_processed_path),
             "rows": int(len(y_val_np)),
             "partitions": int(X_val.npartitions),
         },

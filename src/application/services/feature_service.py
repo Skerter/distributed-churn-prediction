@@ -792,7 +792,7 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
     test_processed_path = processed_dir / "test_processed.parquet"
     maps_path = processed_dir / "target_encoding_maps.json"
 
-    logger.info("Старт leakage-safe feature engineering для dask_local")
+    logger.info("Старт feature engineering для dask_local")
     logger.debug("train_path=%s", train_path)
     logger.debug("test_path=%s", test_path)
     logger.debug("train_processed_path=%s", train_processed_path)
@@ -885,7 +885,7 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
 
     if settings.preprocessing.target_encoding:
         logger.info(
-            "Включён leakage-safe Dask target encoding для колонок: %s",
+            "Включён Dask target encoding для колонок: %s",
             categorical_columns,
         )
 
@@ -948,7 +948,6 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
             "test_size": float(settings.model.test_size),
             "random_state": int(settings.model.random_state),
             "stratified_by": target_column,
-            "leakage_safe": True,
             "strategy": "dask_class_wise_random_split",
         },
         "feature_flags": {

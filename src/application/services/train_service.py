@@ -318,13 +318,12 @@ def train_dask_local_model(
     """Выполняет полный сценарий обучения модели в режиме dask_local.
 
     Сценарий шага:
-    1. Загружаем обработанный parquet через Dask
-    2. Делаем distributed split через random_split
-    3. Подготавливаем Dask X/y
-    4. Materialize train/validation в памяти кластера через persist
-    5. Обучаем DaskXGBClassifier с early stopping
-    6. Сохраняем booster-модель
-    7. Возвращаем summary по обучению
+    1. Загружаем train/validation parquet через Dask
+    2. Подготавливаем Dask X/y
+    3. Materialize train/validation в памяти кластера через persist
+    4. Обучаем DaskXGBClassifier с early stopping
+    5. Сохраняем booster-модель
+    6. Возвращаем summary по distributed обучению
 
     Args:
         settings (Settings): Настройки приложения.
@@ -333,7 +332,7 @@ def train_dask_local_model(
 
     Raises:
         RuntimeError: Если обучение вызвано без Dask client.
-        FileNotFoundError: Если parquet для обучения не найден.
+        FileNotFoundError: Если parquet для обучения или валидации не найден.
 
     Returns:
         dict[str, object]: Сводка по distributed обучению модели.
@@ -343,41 +342,44 @@ def train_dask_local_model(
         raise RuntimeError("Для Dask local training требуется активный Dask client")
 
     train_processed_path = settings.data_processed_dir / "train_processed.parquet"
+    valid_processed_path = settings.data_processed_dir / "valid_processed.parquet"
     model_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}.json"
 
     logger.info("Старт Dask local обучения")
     logger.debug("train_processed_path=%s", train_processed_path)
+    logger.debug("valid_processed_path=%s", valid_processed_path)
     logger.debug("model_path=%s", model_path)
 
     if not train_processed_path.exists():
-        logger.error("Не найден parquet для обучения: %s", train_processed_path)
-        raise FileNotFoundError(f"Не найден parquet для обучения: {train_processed_path}")
+        logger.error("Не найден train parquet для обучения: %s", train_processed_path)
+        raise FileNotFoundError(
+            f"Не найден train parquet для обучения: {train_processed_path}"
+        )
 
-    ddf = dd.read_parquet(train_processed_path)
+    if not valid_processed_path.exists():
+        logger.error("Не найден valid parquet для early stopping: %s", valid_processed_path)
+        raise FileNotFoundError(
+            f"Не найден valid parquet для early stopping: {valid_processed_path}"
+        )
+
+    train_ddf = dd.read_parquet(train_processed_path)
+    valid_ddf = dd.read_parquet(valid_processed_path)
+
     logger.info(
-        "Dask parquet загружен: partitions=%s columns=%s",
-        ddf.npartitions,
-        list(ddf.columns),
+        "Dask parquet загружены: train_partitions=%s valid_partitions=%s",
+        train_ddf.npartitions,
+        valid_ddf.npartitions,
     )
-
-    total_rows = int(ddf.map_partitions(len).sum().compute())
-    logger.info("Размер набора до split: rows=%s", total_rows)
-
-    logger.info(
-        "Подготовка distributed split: train_size=%.3f val_size=%.3f",
-        1.0 - settings.model.test_size,
-        settings.model.test_size,
-    )
-    train_ddf, val_ddf = ddf.random_split(
-        [1.0 - settings.model.test_size, settings.model.test_size],
-        random_state=settings.model.random_state,
-    )
+    logger.debug("train_columns=%s", list(train_ddf.columns))
+    logger.debug("valid_columns=%s", list(valid_ddf.columns))
 
     X_train, y_train = prepare_dask_features_target(train_ddf, settings, logger)
-    X_val, y_val = prepare_dask_features_target(val_ddf, settings, logger)
+    X_val, y_val = prepare_dask_features_target(valid_ddf, settings, logger)
 
     logger.info("Persist train/validation наборов в памяти кластера")
-    X_train, y_train, X_val, y_val = client.persist([X_train, y_train, X_val, y_val])
+    X_train, y_train, X_val, y_val = client.persist(
+        [X_train, y_train, X_val, y_val]
+    )
     wait([X_train, y_train, X_val, y_val])
 
     train_rows = int(y_train.map_partitions(len).sum().compute())
@@ -392,13 +394,13 @@ def train_dask_local_model(
 
     try:
         val_target_rate = float(y_val.mean().compute())
-        logger.debug("val target rate=%.6f", val_target_rate)
+        logger.debug("valid target rate=%.6f", val_target_rate)
     except Exception:
-        logger.warning("Не удалось вычислить val target rate")
+        logger.warning("Не удалось вычислить valid target rate")
         val_target_rate = None
 
     logger.info(
-        "Split materialized: train_rows=%s val_rows=%s",
+        "Leakage-safe split материализован: train_rows=%s val_rows=%s",
         train_rows,
         val_rows,
     )
@@ -435,4 +437,5 @@ def train_dask_local_model(
         "train_target_rate": train_target_rate,
         "val_target_rate": val_target_rate,
         "best_iteration": int(best_iteration) if best_iteration is not None else None,
+        "validation_source": str(valid_processed_path),
     }
