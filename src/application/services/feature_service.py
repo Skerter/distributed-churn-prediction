@@ -147,13 +147,21 @@ def _create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return result
 
-# Неактуальная версия, оставил для сравнения
-def _target_encode(train_df: pd.DataFrame, test_df: pd.DataFrame,categorical_columns: list[str],
-                   target_column: str, smoothing: float, logger) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, dict[str, float]]]:
+
+def _target_encode(
+    train_df: pd.DataFrame,
+    valid_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    categorical_columns: list[str],
+    target_column: str,
+    smoothing: float,
+    logger: Logger,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     """Применяет target encoding к указанным категориальным колонкам.
 
     Args:
         train_df (pd.DataFrame): DataFrame для обучения
+        valid_df (pd.DataFrame): DataFrame для валидации
         test_df (pd.DataFrame): DataFrame для тестирования
         categorical_columns (list[str]): Список категориальных колонок
         target_column (str): Название целевой колонки
@@ -161,9 +169,10 @@ def _target_encode(train_df: pd.DataFrame, test_df: pd.DataFrame,categorical_col
         logger (logging.Logger): Логгер для записи информации
 
     Returns:
-        tuple[pd.DataFrame, pd.DataFrame, dict[str, dict[str, float]]]: Кортеж из обновленных DataFrame и словаря с mapping
+        tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, dict[str, float]]]: Кортеж из обновленных DataFrame и словаря с mapping
     """
     train_result = train_df.copy()
+    valid_result = valid_df.copy()
     test_result = test_df.copy()
 
     prior = float(train_result[target_column].mean())
@@ -175,79 +184,44 @@ def _target_encode(train_df: pd.DataFrame, test_df: pd.DataFrame,categorical_col
         logger.info("Target encoding колонки %s", column)
 
         stats = train_result.groupby(column)[target_column].agg(["mean", "count"])
-        smoothed = (stats["count"] * stats["mean"] + smoothing * prior) / (stats["count"] + smoothing)
 
-        mapping = {str(key): float(value) for key, value in smoothed.to_dict().items()}
-        mappings[column] = mapping
-
-        train_result[column] = train_result[column].map(smoothed).fillna(prior)
-        test_result[column] = test_result[column].map(smoothed).fillna(prior)
-
-        logger.debug("Колонка %s успешно target-encoded. Уникальных значений=%s",
-                     column, len(mapping))
-
-    return train_result, test_result, mappings
-
-
-def _target_encode_many(
-    fit_df: pd.DataFrame,
-    frames: dict[str, pd.DataFrame],
-    categorical_columns: list[str],
-    target_column: str,
-    smoothing: float,
-    logger: Logger,
-) -> tuple[dict[str, pd.DataFrame], dict[str, Any]]:
-    """Выполняет target encoding для нескольких DataFrame на основе одного fit_df.
-
-    Args:
-        fit_df (pd.DataFrame): DataFrame, на котором считаются статистики для target encoding
-        frames (dict[str, pd.DataFrame]): Словарь с DataFrame для применения target encoding
-        categorical_columns (list[str]): Список категориальных колонок
-        target_column (str): Название целевой колонки
-        smoothing (float): Параметр сглаживания
-        logger (Logger): Логгер для записи информации
-
-    Returns:
-        tuple[dict[str, pd.DataFrame], dict[str, Any]]: Кортеж из словаря с обновленными DataFrame и словаря с состоянием encoder-а для сохранения в JSON
-    """
-    result_frames = {name: frame.copy() for name, frame in frames.items()}
-
-    prior = float(fit_df[target_column].mean())
-    logger.debug("Target encoding prior=%.6f", prior)
-
-    mappings: dict[str, dict[str, float]] = {}
-
-    for column in categorical_columns:
-        logger.info("Target encoding колонки %s", column)
-
-        stats = fit_df.groupby(column)[target_column].agg(["mean", "count"])
         smoothed = (
             stats["count"] * stats["mean"] + smoothing * prior
         ) / (stats["count"] + smoothing)
 
         runtime_mapping = smoothed.to_dict()
+
         mappings[column] = {
             str(key): float(value)
             for key, value in runtime_mapping.items()
         }
 
-        for frame_name, frame in result_frames.items():
-            if column not in frame.columns:
-                continue
+        train_result[column] = (
+            train_result[column]
+            .map(runtime_mapping)
+            .fillna(prior)
+            .astype("float64")
+        )
 
-            frame[column] = (
-                frame[column]
-                .map(runtime_mapping)
-                .fillna(prior)
-                .astype("float64")
-            )
+        valid_result[column] = (
+            valid_result[column]
+            .map(runtime_mapping)
+            .fillna(prior)
+            .astype("float64")
+        )
 
-            logger.debug(
-                "%s: колонка %s target-encoded, mapping_size=%s",
-                frame_name,
-                column,
-                len(runtime_mapping),
-            )
+        test_result[column] = (
+            test_result[column]
+            .map(runtime_mapping)
+            .fillna(prior)
+            .astype("float64")
+        )
+
+        logger.debug(
+            "Колонка %s успешно target-encoded. mapping_size=%s",
+            column,
+            len(runtime_mapping),
+        )
 
     encoder_state = {
         "prior": prior,
@@ -256,7 +230,8 @@ def _target_encode_many(
         "mappings": mappings,
     }
 
-    return result_frames, encoder_state
+    return train_result, valid_result, test_result, encoder_state
+
 
 def _save_json(path: Path, payload: dict[str, Any]) -> None:
     """Сохраняет словарь в JSON файл.
@@ -402,22 +377,15 @@ def run_pandas_feature_engineering(settings: Settings, logger: Logger) -> dict[s
             categorical_columns,
         )
 
-        encoded_frames, encoder_state = _target_encode_many(
-            fit_df=train_df,
-            frames={
-                "train": train_df,
-                "valid": valid_df,
-                "test": test_df,
-            },
+        train_df, valid_df, test_df, encoder_state = _target_encode(
+            train_df=train_df,
+            valid_df=valid_df,
+            test_df=test_df,
             categorical_columns=categorical_columns,
             target_column=target_column,
             smoothing=settings.preprocessing.smoothing,
             logger=logger,
         )
-
-        train_df = encoded_frames["train"]
-        valid_df = encoded_frames["valid"]
-        test_df = encoded_frames["test"]
 
         _save_json(maps_path, encoder_state)
         logger.info("Маппинги target encoding сохранены: %s", maps_path)
