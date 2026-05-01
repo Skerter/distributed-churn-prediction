@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 import sys
 
-from src.churn.app.bootstrap import bootstrap
-from src.churn.application.dto.requests import RunPipelineRequest
-from src.churn.application.use_cases.get_health import get_health
-from src.churn.application.use_cases.run_pipeline import run_pipeline
-from src.churn.infrastructure.execution.dask_client import close_dask_client
-from src.churn.presentation.cli.parser import build_parser
+from app.bootstrap import bootstrap
+from application.dto.requests import RunPipelineRequest
+from application.use_cases.get_health import get_health
+from application.use_cases.run_pipeline import run_pipeline
+from infrastructure.execution.dask_client import close_dask_client
+from presentation.cli.parser import build_parser
 
 
 def main() -> int:

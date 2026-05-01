@@ -11,7 +11,7 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score
 from xgboost import XGBClassifier
 from xgboost.dask import DaskXGBClassifier
 
-from src.churn.app.settings import Settings
+from app.settings import Settings
 
 
 def prepare_features_target(

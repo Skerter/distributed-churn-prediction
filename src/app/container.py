@@ -5,9 +5,9 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from src.churn.app.settings import Settings
-from src.churn.shared.enums import BackendKind
-from src.churn.shared.exceptions import PipelineResolutionError
+from app.settings import Settings
+from shared.enums import BackendKind
+from shared.exceptions import PipelineResolutionError
 
 
 @dataclass(slots=True)

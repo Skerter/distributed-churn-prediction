@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.churn.shared.enums import RuntimeMode
-from src.churn.shared.exceptions import ConfigError
+from shared.enums import RuntimeMode
+from shared.exceptions import ConfigError
 
 
 @dataclass(slots=True)

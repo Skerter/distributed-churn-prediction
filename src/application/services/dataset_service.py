@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from src.churn.app.settings import Settings
+from app.settings import Settings
 
 
 def _find_file(root: Path, filename: str) -> Path:

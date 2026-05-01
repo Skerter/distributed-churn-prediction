@@ -1,5 +1,5 @@
-from src.churn.application.dto.responses import HealthResponse
-from src.churn.app.container import AppContainer
+from application.dto.responses import HealthResponse
+from app.container import AppContainer
 
 
 def get_health(container: AppContainer) -> HealthResponse:

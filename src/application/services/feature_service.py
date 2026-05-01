@@ -13,7 +13,7 @@ import pandas as pd
 from dask.distributed import wait
 from sklearn.model_selection import train_test_split
 
-from src.churn.app.settings import Settings
+from app.settings import Settings
 
 
 FEATURE_REQUIRED_COLUMNS = [

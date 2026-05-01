@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src.churn.shared.enums import BackendKind, RuntimeMode
-from src.churn.shared.exceptions import RuntimeModeError
+from shared.enums import BackendKind, RuntimeMode
+from shared.exceptions import RuntimeModeError
 
 
 def resolve_backend(mode: RuntimeMode) -> BackendKind:

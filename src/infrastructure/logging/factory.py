@@ -5,7 +5,7 @@ import sys
 
 import coloredlogs
 
-from src.churn.app.settings import Settings
+from app.settings import Settings
 
 
 def build_logger(settings: Settings, name: str | None = None) -> logging.Logger:

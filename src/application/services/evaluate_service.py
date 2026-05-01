@@ -22,8 +22,8 @@ from sklearn.metrics import (
 )
 from xgboost.dask import predict
 
-from src.churn.app.settings import Settings
-from src.churn.application.services.train_service import (
+from app.settings import Settings
+from application.services.train_service import (
     prepare_dask_features_target,
     prepare_features_target,
 )

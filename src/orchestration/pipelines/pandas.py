@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from src.churn.application.services.dataset_service import ensure_source_dataset
-from src.churn.application.services.evaluate_service import evaluate_pandas_model
-from src.churn.application.services.feature_service import run_pandas_feature_engineering
-from src.churn.application.services.train_service import train_pandas_model
+from application.services.dataset_service import ensure_source_dataset
+from application.services.evaluate_service import evaluate_pandas_model
+from application.services.feature_service import run_pandas_feature_engineering
+from application.services.train_service import train_pandas_model
 
 from .base import BasePipeline
 

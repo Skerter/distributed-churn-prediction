@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.churn.app.settings import Settings
+from app.settings import Settings
 
 
 def ensure_project_dirs(settings: Settings) -> None:
