@@ -624,17 +624,85 @@ def _create_dask_features(ddf: dd.DataFrame) -> dd.DataFrame:
     return result
 
 
-def _target_encode_dask(train_ddf: dd.DataFrame, test_ddf: dd.DataFrame, categorical_columns: list[str], target_column: str,
-                        smoothing: float, logger: Logger) -> tuple[dd.DataFrame, dd.DataFrame, dict[str, dict[str, float]]]:
+def _split_dask_train_valid_by_target(
+    ddf: dd.DataFrame,
+    target_column: str,
+    test_size: float,
+    random_state: int,
+    logger: Logger,
+) -> tuple[dd.DataFrame, dd.DataFrame]:
+    """Делит Dask DataFrame на train/validation до preprocessing.
+    
+    Dask DataFrame не имеет полного аналога sklearn train_test_split(..., stratify=...),
+    поэтому здесь используется class-wise split:
+    1. отдельно берём строки каждого класса target;
+    2. отдельно делим каждый класс через random_split;
+    3. собираем train и validation обратно через dd.concat.
+    
+    Args:
+        ddf (dd.DataFrame): Входной Dask DataFrame.
+        target_column (str): Название целевой колонки для стратификации.
+        test_size (float): Доля validation части от общего количества строк.
+        random_state (int): Фиксированное значение для генератора случайных чисел
+            для воспроизводимости.
+        logger (Logger): Логгер для диагностических сообщений.
+    
+    Returns:
+        tuple[dd.DataFrame, dd.DataFrame]: Кортеж из train и validation Dask DataFrame.
+    """
+    class_values = ddf[target_column].dropna().unique().compute().tolist()
+
+    if not class_values:
+        raise ValueError(f"Не найдены классы в target_column={target_column}")
+
+    logger.info(
+        "Dask class-wise split до preprocessing: target_column=%s classes=%s test_size=%.3f",
+        target_column,
+        class_values,
+        test_size,
+    )
+
+    train_parts = []
+    valid_parts = []
+
+    for class_value in sorted(class_values):
+        class_ddf = ddf[ddf[target_column] == class_value]
+
+        class_train_ddf, class_valid_ddf = class_ddf.random_split(
+            [1.0 - test_size, test_size],
+            random_state=random_state,
+        )
+
+        train_parts.append(class_train_ddf)
+        valid_parts.append(class_valid_ddf)
+
+        logger.debug("Класс %s добавлен в Dask split", class_value)
+
+    train_ddf = dd.concat(train_parts, interleave_partitions=True)
+    valid_ddf = dd.concat(valid_parts, interleave_partitions=True)
+
+    return train_ddf, valid_ddf
+
+
+def _target_encode_dask(
+    train_ddf: dd.DataFrame,
+    valid_ddf: dd.DataFrame,
+    test_ddf: dd.DataFrame,
+    categorical_columns: list[str],
+    target_column: str,
+    smoothing: float,
+    logger: Logger,
+) -> tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame, dict[str, Any]]:
     """Выполняет target encoding для Dask DataFrame.
 
-    Архитектурно здесь важно следующее:
-    1. статистики считаются только по train;
-    2. mapping строится централизованно;
-    3. затем mapping распределённо применяется к train и test через partitions.
+    Важно:
+    - статистики target encoding считаются только по train_ddf;
+    - один и тот же mapping применяется к train_ddf, valid_ddf и test_ddf;
+    - valid_ddf и test_ddf не участвуют в построении mapping.
 
     Args:
         train_ddf (dd.DataFrame): Train-датасет.
+        valid_ddf (dd.DataFrame): Validation-датасет.
         test_ddf (dd.DataFrame): Test-датасет.
         categorical_columns (list[str]): Колонки для target encoding.
         target_column (str): Название целевой колонки.
@@ -642,30 +710,43 @@ def _target_encode_dask(train_ddf: dd.DataFrame, test_ddf: dd.DataFrame, categor
         logger: Логгер для диагностических сообщений.
 
     Returns:
-        tuple[dd.DataFrame, dd.DataFrame, dict[str, dict[str, float]]]:
-            Обновлённые train/test Dask DataFrame и словарь mapping-ов
+        tuple[dd.DataFrame, dd.DataFrame, dd.DataFrame, dict[str, dict[str, float]]]:
+            Обновлённые train/valid/test Dask DataFrame и словарь mapping-ов
             для последующего сохранения в JSON.
     """
     train_result = train_ddf
+    valid_result = valid_ddf
     test_result = test_ddf
 
     prior = float(train_result[target_column].mean().compute())
     logger.debug("Dask target encoding prior=%.6f", prior)
 
-    serializable_mappings: dict[str, dict[str, float]] = {}
+    mappings: dict[str, dict[str, float]] = {}
 
     for column in categorical_columns:
         logger.info("Dask target encoding колонки %s", column)
 
         stats = train_result.groupby(column)[target_column].agg(["mean", "count"]).compute()
 
-        smoothed = (stats["count"] * stats["mean"] + smoothing * prior) / (stats["count"] + smoothing)
+        smoothed = (
+            stats["count"] * stats["mean"] + smoothing * prior
+        ) / (stats["count"] + smoothing)
 
         runtime_mapping = smoothed.to_dict()
-        json_mapping = {str(key): float(value) for key, value in runtime_mapping.items()}
-        serializable_mappings[column] = json_mapping
+
+        mappings[column] = {
+            str(key): float(value)
+            for key, value in runtime_mapping.items()
+        }
 
         train_result[column] = train_result[column].map_partitions(
+            lambda series, mapping=runtime_mapping, default_value=prior: (
+                series.map(mapping).fillna(default_value).astype("float64")
+            ),
+            meta=(column, "float64"),
+        )
+
+        valid_result[column] = valid_result[column].map_partitions(
             lambda series, mapping=runtime_mapping, default_value=prior: (
                 series.map(mapping).fillna(default_value).astype("float64")
             ),
@@ -679,10 +760,20 @@ def _target_encode_dask(train_ddf: dd.DataFrame, test_ddf: dd.DataFrame, categor
             meta=(column, "float64"),
         )
 
-        logger.debug("Колонка %s успешно target-encoded. Уникальных значений=%s",
-                     column, len(runtime_mapping))
+        logger.debug(
+            "Колонка %s успешно target-encoded. mapping_size=%s",
+            column,
+            len(runtime_mapping),
+        )
 
-    return train_result, test_result, serializable_mappings
+    encoder_state = {
+        "prior": prior,
+        "target_column": target_column,
+        "categorical_columns": categorical_columns,
+        "mappings": mappings,
+    }
+
+    return train_result, valid_result, test_result, encoder_state
 
 
 def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> dict[str, Any]:
@@ -729,64 +820,110 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
         raise FileNotFoundError(f"Не найден test dataset: {test_path}")
 
     train_processed_path = processed_dir / "train_processed.parquet"
+    valid_processed_path = processed_dir / "valid_processed.parquet"
     test_processed_path = processed_dir / "test_processed.parquet"
     maps_path = processed_dir / "target_encoding_maps.json"
 
-    logger.info("Старт feature engineering для dask_local")
+    logger.info("Старт leakage-safe feature engineering для dask_local")
     logger.debug("train_path=%s", train_path)
     logger.debug("test_path=%s", test_path)
     logger.debug("train_processed_path=%s", train_processed_path)
+    logger.debug("valid_processed_path=%s", valid_processed_path)
     logger.debug("test_processed_path=%s", test_processed_path)
     logger.debug("maps_path=%s", maps_path)
-    
-    train_ddf = dd.read_csv(train_path, assume_missing=True, blocksize="64MB")
+
+    raw_train_ddf = dd.read_csv(train_path, assume_missing=True, blocksize="64MB")
     test_ddf = dd.read_csv(test_path, assume_missing=True, blocksize="64MB")
-    
-    logger.info("CSV открыты через Dask: train_partitions=%s, test_partitions=%s",
-                train_ddf.npartitions, test_ddf.npartitions)
+
+    logger.info(
+        "CSV открыты через Dask: raw_train_partitions=%s, test_partitions=%s",
+        raw_train_ddf.npartitions,
+        test_ddf.npartitions,
+    )
 
     categorical_columns = list(settings.preprocessing.categorical_columns)
     target_column = settings.data.target_column
-    
+
     _validate_columns_by_names(
-        list(train_ddf.columns),
+        list(raw_train_ddf.columns),
         categorical_columns + FEATURE_REQUIRED_COLUMNS + [target_column],
-        "train",
+        "raw_train",
     )
     _validate_columns_by_names(
         list(test_ddf.columns),
         categorical_columns + FEATURE_REQUIRED_COLUMNS,
         "test",
     )
-    
+
+    train_ddf, valid_ddf = _split_dask_train_valid_by_target(
+        ddf=raw_train_ddf,
+        target_column=target_column,
+        test_size=settings.model.test_size,
+        random_state=settings.model.random_state,
+        logger=logger,
+    )
+
+    logger.info(
+        "Dask train/validation split выполнен до preprocessing: train_partitions=%s, valid_partitions=%s",
+        train_ddf.npartitions,
+        valid_ddf.npartitions,
+    )
+
     fill_values = _build_dask_numeric_fill_values(
         train_ddf=train_ddf,
         strategy=settings.preprocessing.fillna_num,
         target_column=target_column,
-        logger=logger
+        logger=logger,
     )
-    
-    train_ddf = _fill_dask_numeric_na(train_ddf, fill_values, logger, "train")
-    test_ddf = _fill_dask_numeric_na(test_ddf, fill_values, logger, "test")
-    
-    train_ddf = _fill_dask_categorical_na(train_ddf, categorical_columns,
-                                          settings.preprocessing.fillna_cat, logger, "train")
-    test_ddf = _fill_dask_categorical_na(test_ddf, categorical_columns,
-                                         settings.preprocessing.fillna_cat, logger, "test")
-    
-    logger.info("Заполнение пропусков завершено")
-    
-    train_ddf = _create_dask_features(train_ddf)
-    test_ddf = _create_dask_features(test_ddf)
-    
-    logger.info("Созданы новые признаки: AVG_REVENUE, RECH_TO_DATA_RATIO, "
-                "REGULARITY_SCORE, HAS_TOP_PACK, MISSING_ZONE")
-    
-    if settings.preprocessing.target_encoding:
-        logger.info("Включён Dask target encoding для колонок: %s", categorical_columns)
 
-        train_ddf, test_ddf, mappings = _target_encode_dask(
+    logger.debug("Dask fill values построены только по train-part: %s", fill_values)
+
+    train_ddf = _fill_dask_numeric_na(train_ddf, fill_values, logger, "train")
+    valid_ddf = _fill_dask_numeric_na(valid_ddf, fill_values, logger, "valid")
+    test_ddf = _fill_dask_numeric_na(test_ddf, fill_values, logger, "test")
+
+    train_ddf = _fill_dask_categorical_na(
+        train_ddf,
+        categorical_columns,
+        settings.preprocessing.fillna_cat,
+        logger,
+        "train",
+    )
+    valid_ddf = _fill_dask_categorical_na(
+        valid_ddf,
+        categorical_columns,
+        settings.preprocessing.fillna_cat,
+        logger,
+        "valid",
+    )
+    test_ddf = _fill_dask_categorical_na(
+        test_ddf,
+        categorical_columns,
+        settings.preprocessing.fillna_cat,
+        logger,
+        "test",
+    )
+
+    logger.info("Dask заполнение пропусков завершено")
+
+    train_ddf = _create_dask_features(train_ddf)
+    valid_ddf = _create_dask_features(valid_ddf)
+    test_ddf = _create_dask_features(test_ddf)
+
+    logger.info(
+        "Созданы новые признаки: AVG_REVENUE, RECH_TO_DATA_RATIO, "
+        "REGULARITY_SCORE, HAS_TOP_PACK, MISSING_ZONE"
+    )
+
+    if settings.preprocessing.target_encoding:
+        logger.info(
+            "Включён leakage-safe Dask target encoding для колонок: %s",
+            categorical_columns,
+        )
+
+        train_ddf, valid_ddf, test_ddf, encoder_state = _target_encode_dask(
             train_ddf=train_ddf,
+            valid_ddf=valid_ddf,
             test_ddf=test_ddf,
             categorical_columns=categorical_columns,
             target_column=target_column,
@@ -794,41 +931,57 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
             logger=logger,
         )
 
-        _save_json(maps_path, mappings)
+        _save_json(maps_path, encoder_state)
         logger.info("Маппинги Dask target encoding сохранены: %s", maps_path)
     else:
         logger.warning("Target encoding отключён конфигом")
-        mappings = {}
-    
+        encoder_state = {}
+
     logger.info("Persist графа feature engineering в памяти кластера")
-    train_ddf = client.persist(train_ddf)
-    test_ddf = client.persist(test_ddf)
-    wait([train_ddf, test_ddf])
-    
+    train_ddf, valid_ddf, test_ddf = client.persist([train_ddf, valid_ddf, test_ddf])
+    wait([train_ddf, valid_ddf, test_ddf])
+
     _cleanup_output_path(train_processed_path)
+    _cleanup_output_path(valid_processed_path)
     _cleanup_output_path(test_processed_path)
 
     logger.info("Сохранение Dask parquet datasets")
     train_ddf.to_parquet(train_processed_path, write_index=False)
+    valid_ddf.to_parquet(valid_processed_path, write_index=False)
     test_ddf.to_parquet(test_processed_path, write_index=False)
-    
+
     train_rows = _count_dask_rows(train_ddf)
+    valid_rows = _count_dask_rows(valid_ddf)
     test_rows = _count_dask_rows(test_ddf)
-    
-    logger.info("Dask feature engineering завершён успешно: train_rows=%s, test_rows=%s",
-                train_rows, test_rows)
-    
+
+    logger.info(
+        "Dask feature engineering завершён успешно: train_rows=%s, valid_rows=%s, test_rows=%s",
+        train_rows,
+        valid_rows,
+        test_rows,
+    )
+
     return {
         "train_shape": [int(train_rows), len(train_ddf.columns)],
+        "valid_shape": [int(valid_rows), len(valid_ddf.columns)],
         "test_shape": [int(test_rows), len(test_ddf.columns)],
         "partitions": {
             "train": int(train_ddf.npartitions),
+            "valid": int(valid_ddf.npartitions),
             "test": int(test_ddf.npartitions),
         },
         "artifacts": {
             "train_processed_path": str(train_processed_path),
+            "valid_processed_path": str(valid_processed_path),
             "test_processed_path": str(test_processed_path),
-            "encoding_maps_path": str(maps_path) if mappings else None,
+            "encoding_maps_path": str(maps_path) if encoder_state else None,
+        },
+        "split": {
+            "test_size": float(settings.model.test_size),
+            "random_state": int(settings.model.random_state),
+            "stratified_by": target_column,
+            "leakage_safe": True,
+            "strategy": "dask_class_wise_random_split",
         },
         "feature_flags": {
             "target_encoding": settings.preprocessing.target_encoding,
