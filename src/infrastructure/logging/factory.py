@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import logging
+import coloredlogs
 import sys
 
-import coloredlogs
-
-from app.settings import Settings
+from src.app.settings import Settings
 
 
 def build_logger(settings: Settings, name: str | None = None) -> logging.Logger:

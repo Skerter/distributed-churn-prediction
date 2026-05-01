@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from app.settings import Settings
+from src.app.settings import Settings
 
 
 def _find_file(root: Path, filename: str) -> Path:

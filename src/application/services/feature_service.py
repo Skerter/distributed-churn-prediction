@@ -13,7 +13,7 @@ import pandas as pd
 from dask.distributed import wait
 from sklearn.model_selection import train_test_split
 
-from app.settings import Settings
+from src.app.settings import Settings
 
 
 FEATURE_REQUIRED_COLUMNS = [
@@ -544,7 +544,7 @@ def _build_dask_numeric_fill_values(train_ddf: dd.DataFrame, strategy: str,
                            "Рекомендуется использовать mean или выполнить fillna на pandas DataFrame.")
             raise NotImplementedError("Dask не поддерживает эффективный способ вычисления медианы для больших DataFrame.")
             # tasks[column] = train_ddf[column].median()
-            # TODO: Добавить поддержку медианы для Dask
+            # BUG: Добавить поддержку медианы для Dask
             
     fill_values = dask.compute(tasks)[0]
     for column, value in fill_values.items():

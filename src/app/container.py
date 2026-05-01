@@ -5,9 +5,9 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from app.settings import Settings
-from shared.enums import BackendKind
-from shared.exceptions import PipelineResolutionError
+from src.app.settings import Settings
+from src.shared.enums import BackendKind
+from src.shared.exceptions import PipelineResolutionError
 
 
 @dataclass(slots=True)

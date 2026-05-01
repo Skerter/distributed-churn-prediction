@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from app.container import AppContainer
-from app.settings import Settings
-from infrastructure.config.loader import find_project_root, load_settings_dict
-from infrastructure.execution.backend import resolve_backend  # Нахуй не нужен, можно юзать только runtime.mode
-from infrastructure.execution.dask_client import create_dask_client
-from infrastructure.logging.factory import build_logger
-from infrastructure.storage.paths import ensure_project_dirs
+from src.app.container import AppContainer
+from src.app.settings import Settings
+from src.infrastructure.config.loader import find_project_root, load_settings_dict
+from src.infrastructure.execution.backend import resolve_backend  # TODO: Нахуй не нужен, можно юзать только runtime.mode
+from src.infrastructure.execution.dask_client import create_dask_client
+from src.infrastructure.logging.factory import build_logger
+from src.infrastructure.storage.paths import ensure_project_dirs
 
 
 def bootstrap(profile: str = "pandas") -> AppContainer:
@@ -28,9 +28,9 @@ def bootstrap(profile: str = "pandas") -> AppContainer:
     dask_client = create_dask_client(settings, logger)
 
     pipeline_registry = {
-        "pandas": "src.churn.orchestration.pipelines.pandas.PandasPipeline",
-        "dask_local": "src.churn.orchestration.pipelines.dask_local.DaskLocalPipeline",
-        "dask_k8s": "src.churn.orchestration.pipelines.dask_k8s.DaskK8sPipeline",
+        "pandas": "src.orchestration.pipelines.pandas.PandasPipeline",
+        "dask_local": "src.orchestration.pipelines.dask_local.DaskLocalPipeline",
+        "dask_k8s": "src.orchestration.pipelines.dask_k8s.DaskK8sPipeline",
     }
 
     logger.info(

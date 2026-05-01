@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.settings import Settings
+from src.app.settings import Settings
 
 
 def ensure_project_dirs(settings: Settings) -> None:

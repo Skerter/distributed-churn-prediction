@@ -1,6 +1,6 @@
-from app.container import AppContainer
-from application.dto.requests import RunPipelineRequest
-from application.dto.responses import RunPipelineResponse
+from src.app.container import AppContainer
+from src.application.dto.requests import RunPipelineRequest
+from src.application.dto.responses import RunPipelineResponse
 
 
 def run_pipeline(container: AppContainer, request: RunPipelineRequest) -> RunPipelineResponse:

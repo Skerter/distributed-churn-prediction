@@ -6,7 +6,7 @@ from typing import Any
 
 import yaml
 
-from shared.exceptions import ConfigError
+from src.shared.exceptions import ConfigError
 
 
 def find_project_root(start_path: Path | None = None) -> Path:

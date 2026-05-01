@@ -2,11 +2,11 @@
 .vscode/
 .data/
 notebooks/eval_plots/
+notebooks/model_plots/
 logs/
 archive/
 data/processed/*.json
 models/*.json
-
 
 *.csv
 *.parquet

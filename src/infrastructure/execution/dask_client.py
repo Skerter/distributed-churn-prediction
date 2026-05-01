@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.settings import Settings
-from shared.enums import RuntimeMode
-from shared.exceptions import ConfigError
+from src.app.settings import Settings
+from src.shared.enums import RuntimeMode
+from src.shared.exceptions import ConfigError
 
 
 def create_dask_client(settings: Settings, logger) -> Any | None:
