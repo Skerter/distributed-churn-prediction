@@ -448,5 +448,4 @@ def train_dask_local_model(
         "val_target_rate": val_target_rate,
         "best_iteration": int(best_iteration) if best_iteration is not None else None,
         "validation_source": str(valid_processed_path),
-        "leakage_safe": True,
     }
