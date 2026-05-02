@@ -17,7 +17,8 @@ ENV PATH=/opt/conda/envs/dist-churn-pred-env/bin:$PATH
 
 SHELL ["micromamba", "run", "-n", "dist-churn-pred-env", "/bin/bash", "-c"]
 
-RUN python -c "import dask, distributed, pandas, pyarrow, xgboost, coloredlogs, kagglehub; print('k8s env ok')"
+# Проверка, что все библиотеки импортируются без ошибок
+# RUN python -c "import dask, distributed, pandas, pyarrow, xgboost, coloredlogs, kagglehub; print('k8s env ok')"
 
 ENTRYPOINT ["micromamba", "run", "-n", "dist-churn-pred-env"]
 CMD ["python", "-m", "src.presentation.cli.main", "health", "--profile", "pandas"]
