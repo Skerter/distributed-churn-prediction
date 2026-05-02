@@ -1,543 +1,1203 @@
 # Distributed Churn Prediction
 
-Проект по построению и постепенному масштабированию ML-пайплайна для задачи предсказания оттока клиентов.
+`distributed-churn-prediction` — учебно-инженерный ML/MLOps-проект для задачи предсказания оттока клиентов.
 
-Основная цель проекта — пройти путь от локального baseline-решения к более зрелой распределённой системе с несколькими способами запуска, понятной архитектурой и расширяемой кодовой базой.
-
----
-
-## Интерфейсы проекта
-
-У проекта предусмотрены **3 интерфейса взаимодействия**:
-
-| Интерфейс | Статус | Назначение |
-|---|---|---|
-| **CLI** | Работает | Основная активная точка входа в проект: запуск health-check, просмотр конфига, dry-run и выполнение pipeline |
-| **API** | В разработке | Планируемый программный интерфейс для внешних сервисов, UI и автоматизации |
-| **Telegram Bot** | В разработке | Планируемый пользовательский интерфейс для удалённого управления запуском и мониторинга сценариев |
-
-Сейчас **рабочим интерфейсом является CLI**. API и Telegram-бот заложены в архитектуру как следующие шаги развития проекта, но пока не доведены до рабочего состояния.
-
----
-
-## Профили выполнения
-
-В проекте предусмотрены три runtime-профиля:
-
-- **`pandas`** — локальный baseline-пайплайн на одной машине;
-- **`dask_local`** — локальный распределённый пайплайн через `Dask LocalCluster`;
-- **`dask_k8s`** — **в разработке**. В кодовой базе уже есть заготовки для подключения к внешнему Dask scheduler, но полноценный production-ready Kubernetes pipeline ещё не завершён.
-
-### Текущий статус профилей
-
-| Профиль | Статус | Комментарий |
-|---|---|---|
-| `pandas` | Работает | Локальный baseline для feature engineering, training и evaluation |
-| `dask_local` | Работает | Распределённая локальная версия через Dask |
-| `dask_k8s` | В разработке | Нет завершённого end-to-end pipeline уровня production |
-
----
-
-## Что делает проект
-
-Проект реализует полный ML workflow:
-
-1. проверяет наличие исходного датасета;
-2. при необходимости скачивает его через `kagglehub`;
-3. строит признаки и сохраняет обработанные данные в `parquet`;
-4. обучает модель XGBoost;
-5. оценивает качество модели и сохраняет метрики и графики.
-
-Главная инженерная идея проекта — не просто обучить модель, а выстроить архитектурную базу, на которой один и тот же сценарий можно запускать через разные runtime-профили и разные интерфейсы доступа.
-
----
-
-## Архитектура проекта
-
-Проект собран вокруг модульной структуры с разделением на уровни приложения:
+Проект показывает один и тот же ML workflow в трёх режимах выполнения:
 
 ```text
-src/churn/
-├── app/
-│   ├── bootstrap.py
-│   ├── container.py
-│   └── settings.py
-├── application/
-│   ├── dto/
-│   ├── services/
-│   └── use_cases/
-├── domain/                     # архитектурное направление / слой предметной модели
-├── infrastructure/
-│   ├── config/
-│   ├── execution/
-│   ├── logging/
-│   └── storage/
-├── orchestration/
-│   └── pipelines/
-└── presentation/
-    ├── cli/
-    ├── api/                    # в разработке
-    └── tg_bot/                 # в разработке
+pandas
+→ dask_local
+→ dask_k8s
 ```
 
-> Важно: это описание отражает **архитектурную модель проекта**, а не только текущую степень заполнения всех папок кодом. На практике сейчас полностью задействованы прежде всего `app`, `application`, `infrastructure`, `orchestration` и `presentation/cli`. Слои `domain`, `presentation/api` и `presentation/tg_bot` пока раскрыты не полностью и относятся к следующему этапу развития.
-
-### Роли слоёв
-
-#### `presentation`
-Слой пользовательских интерфейсов и адаптеров.
-
-Сейчас активно работает:
-
-- **CLI** — основная точка входа.
-
-В будущем сюда же будут относиться:
-
-- **API**;
-- **Telegram Bot**.
-
-Этот слой не должен содержать бизнес-логику пайплайна. Его задача — принять входные данные, вызвать application/use case слой и отдать результат наружу.
-
-#### `application`
-Слой сценариев использования и служебной прикладной логики.
-
-Содержит:
-
-- **DTO** для передачи запросов и ответов между слоями;
-- **use cases** для сценариев уровня приложения;
-- **services** для крупных прикладных операций, например работы с датасетом, признаками, обучением и оценкой.
-
-Именно здесь формируется прикладное поведение системы, которое потом может переиспользоваться из CLI, API и Telegram-бота.
-
-#### `domain`
-Слой предметной модели и контрактов.
-
-Сейчас он скорее выступает как **архитектурно предусмотренный центр будущей доменной логики**, чем как уже полностью реализованный уровень. В перспективе здесь должны жить:
-
-- доменные сущности;
-- value objects;
-- контракты и абстракции предметной области;
-- независимые от инфраструктуры правила модели.
-
-#### `infrastructure`
-Слой технической реализации.
-
-Содержит:
-
-- загрузку и merge конфигов;
-- построение логгера;
-- создание Dask client;
-- работу с файловыми путями и storage-утилитами.
-
-Этот слой отвечает за всё, что связано с внешними инструментами и технической средой выполнения.
-
-#### `orchestration`
-Слой оркестрации pipeline-сценариев.
-
-Именно здесь собираются последовательности шагов:
-
-- загрузка датасета;
-- feature engineering;
-- training;
-- evaluation.
-
-Этот слой определяет порядок выполнения шагов и различия между `pandas`, `dask_local` и будущим `dask_k8s`.
-
-#### `app`
-Композиционный слой приложения.
-
-Содержит:
-
-- `bootstrap()`;
-- контейнер зависимостей;
-- типизированные настройки.
-
-Это место, где приложение собирается в целостную рабочую конфигурацию перед запуском use case или pipeline.
+Цель — наглядно пройти путь от обычного локального пайплайна к распределённой системе: сначала всё выполняется на одной машине, затем через локальный Dask-кластер, затем через Dask scheduler/workers внутри Kubernetes.
 
 ---
 
-## Архитектурная идея
+## Коротко о проекте
 
-Проект использует практический вариант **Layered Architecture** с сильным влиянием идей **Clean Architecture**:
+Проект реализует полный ML pipeline:
 
-- интерфейсы пользователя отделены от прикладной логики;
-- прикладная логика отделена от инфраструктуры;
-- пайплайны собраны в отдельный orchestration-слой;
-- конфигурация и зависимости централизованно создаются в bootstrap;
-- система заранее проектируется так, чтобы один и тот же application-слой можно было использовать из разных интерфейсов.
+1. проверка и загрузка исходного датасета;
+2. feature engineering;
+3. сохранение обработанных данных в Parquet;
+4. обучение XGBoost-модели;
+5. оценка модели;
+6. сохранение модели, метрик, графиков и логов.
 
-Это не «академическая Clean Architecture» в максимально строгом виде, но уже очень близкий практический вариант для ML / MLOps-проекта.
+Источник данных:
 
----
-
-## Какие паттерны уже используются
-
-### 1. Layered Architecture / Clean Architecture ideas
-Код разделён по зонам ответственности:
-
-- `presentation` — точки входа;
-- `application` — use cases, DTO и прикладные сервисы;
-- `domain` — предметная модель и контракты как выделенное архитектурное направление;
-- `infrastructure` — конфиг, логирование, Dask client, storage-утилиты;
-- `orchestration` — пайплайны;
-- `app` — bootstrap и сборка зависимостей.
-
-Это делает проект расширяемым и снижает связность между интерфейсом запуска, пайплайном и инфраструктурой.
-
-### 2. Bootstrap pattern
-Функция `bootstrap()` собирает приложение из:
-
-- конфига;
-- логгера;
-- backend/runtime-связки;
-- Dask client;
-- реестра пайплайнов.
-
-На выходе получается готовый контейнер приложения, который можно передать в use cases и интерфейсы.
-
-### 3. Dependency Injection через container
-`AppContainer` хранит основные зависимости приложения:
-
-- `settings`;
-- `logger`;
-- `backend`;
-- `dask_client`;
-- `pipeline_registry`.
-
-Это позволяет не создавать зависимости хаотично внутри бизнес-логики, а передавать готовое окружение контролируемо и предсказуемо.
-
-### 4. Configuration Object pattern
-Вместо «сырого» словаря из YAML используется типизированный объект `Settings` и вложенные dataclass-конфиги:
-
-- `AppMetaSettings`;
-- `PathsSettings`;
-- `LoggingSettings`;
-- `RuntimeSettings`;
-- `DaskSettings`;
-- `PipelineSettings`;
-- а также настройки модели, preprocessing, training и evaluation.
-
-Это делает конфигурацию безопаснее, удобнее для IDE и понятнее при масштабировании проекта.
-
-### 5. Template Method
-Базовый pipeline задаёт общий шаблон выполнения:
-
-- логирование старта;
-- логирование контекста;
-- обработку ошибок;
-- логирование завершения;
-- единый формат результата.
-
-Конкретные пайплайны реализуют только свою основную часть через `_run_impl()`. Это классический **Template Method**.
-
-### 6. Strategy / Runtime selection
-Режим выполнения выбирается через `RuntimeMode` и реестр pipeline-классов.
-
-Один и тот же общий сценарий может работать в режимах:
-
-- `pandas`;
-- `dask_local`;
-- `dask_k8s`.
-
-Фактически это выбор конкретной стратегии выполнения по конфигу.
-
-### 7. Registry pattern
-В `bootstrap()` используется реестр пайплайнов — словарь, который сопоставляет runtime-режим с dotted-path нужного pipeline-класса.
-
-Это даёт одну централизованную точку управления тем, какой pipeline должен использоваться в конкретном режиме.
-
-### 8. Dynamic Import / Plugin-like loading
-`AppContainer.build_pipeline()` динамически импортирует pipeline-класс через `importlib`, опираясь на строку из registry.
-
-Такой подход похож на лёгкую plugin-style архитектуру: реализация выбирается по конфигурации и подгружается во время выполнения.
-
-### 9. Use Case pattern
-В `application/use_cases` операции оформляются как отдельные сценарии приложения, например:
-
-- `run_pipeline()`;
-- `get_health()`.
-
-Это важно, потому что те же самые use cases потом могут использоваться не только из CLI, но и из API или Telegram-бота.
-
-### 10. DTO (Data Transfer Object)
-Для передачи данных между слоями используются отдельные структуры запроса и ответа, например:
-
-- `RunPipelineRequest`;
-- `HealthResponse`;
-- `RunPipelineResponse`.
-
-Это помогает не разносить по проекту набор случайных аргументов и делает интерфейсы между слоями единообразными.
-
-### 11. Adapter pattern на уровне presentation
-CLI выступает как адаптер над application-слоем:
-
-- читает аргументы;
-- вызывает bootstrap;
-- запускает use case;
-- печатает результат.
-
-Пользовательский интерфейс отделён от прикладной логики, а значит позже на его место можно добавить API и Telegram-бот без переписывания ядра.
-
-### 12. Enum-based constrained state
-`RuntimeMode` и `BackendKind` задают ограниченный набор допустимых режимов и backend-типов.
-
-Это уменьшает количество ошибок из-за строковых литералов и делает поведение системы более предсказуемым.
-
----
-
-## Что уже заложено, но пока раскрыто не полностью
-
-Это важно фиксировать честно.
-
-- **`domain`** пока скорее архитектурная заготовка под будущие доменные сущности и контракты, чем полностью развёрнутый слой.
-- **`application/services`** уже играет полезную роль, но ещё не исчерпал весь потенциал слоя прикладных сервисов.
-- **API** пока только в разработке и не является рабочей точкой входа.
-- **Telegram Bot** тоже пока в разработке и не является рабочей точкой входа.
-- **`dask_k8s`** подготовлен концептуально и частично инфраструктурно, но ещё не доведён до полноценного production-grade pipeline.
-
----
-
-## Стек
-
-- Python 3.11
-- Pandas
-- Dask / Distributed
-- XGBoost
-- Scikit-learn
-- PyArrow / Parquet
-- YAML-конфиги
-- `coloredlogs`
-- `kagglehub`
-
-Для Kubernetes-направления в окружении уже заложены зависимости, связанные с `dask-kubernetes`, но сам `dask_k8s` pipeline пока не доведён до готового сценария запуска.
-
----
-
-## Данные
-
-Источник данных: **Expresso Churn Prediction Challenge**.
-
-В конфиге используется slug датасета:
-
-```yaml
-data:
-  dataset_slug: "hamzaghanmi/expresso-churn-prediction-challenge"
-  train_filename: "Train.csv"
-  test_filename: "Test.csv"
-  target_column: "CHURN"
+```text
+hamzaghanmi/expresso-churn-prediction-challenge
 ```
 
-При отсутствии локальных CSV пайплайн может попробовать скачать датасет автоматически.
+Основной рабочий интерфейс сейчас — CLI:
 
----
-
-## Конфигурация
-
-Базовые параметры задаются через YAML.
-
-Ключевые секции конфига:
-
-- `paths` — пути к данным, моделям, логам и артефактам;
-- `data` — параметры датасета и target-поля;
-- `logging` — уровень логирования и файловый вывод;
-- `runtime` — режим выполнения;
-- `dask` — настройки локального или внешнего scheduler;
-- `model`, `preprocessing`, `training`, `evaluation` — параметры ML-пайплайна.
-
-Пример важных параметров:
-
-```yaml
-model:
-  name: "xgboost"
-  version: "local_baseline_v1"
-  random_state: 42
-  test_size: 0.2
-  cv_folds: 5
-  early_stopping_rounds: 50
-
-preprocessing:
-  fillna_num: "mean"
-  fillna_cat: "missing"
-  target_encoding: true
-  smoothing: 10
-  categorical_columns:
-    - "REGION"
-    - "TENURE"
-    - "TOP_PACK"
+```bash
+python -m src.presentation.cli.main <command> --profile <profile>
 ```
 
 ---
 
-## Установка окружения
+## Навигация
 
-### Linux / WSL
+- [Быстрый старт](#быстрый-старт)
+  - [1. Активировать окружение](#1-активировать-окружение)
+  - [2. Проверить локальный pandas-режим](#2-проверить-локальный-pandas-режим)
+  - [3. Проверить локальный dask_local-режим](#3-проверить-локальный-dask_local-режим)
+  - [4. Запустить dask_k8s через GHCR image](#4-запустить-dask_k8s-через-ghcr-image)
+  - [5. Запустить dask_k8s через локальный image в Minikube](#5-запустить-dask_k8s-через-локальный-image-в-minikube)
+- [Установка с нуля](#установка-с-нуля)
+- [Установка окружения](#установка-окружения)
+- [Runtime-профили](#runtime-профили)
+- [CLI](#cli)
+- [Dask Kubernetes](#dask-kubernetes)
+  - [1. Запуск Minikube](#1-запуск-minikube)
+  - [2. Установка Dask Operator](#2-установка-dask-operator)
+  - [3. Проверить image](#3-проверить-image)
+  - [4. Применить PVC](#4-применить-pvc)
+  - [5. Запустить DaskCluster](#5-запустить-daskcluster)
+  - [6. Запустить pipeline Job](#6-запустить-pipeline-job)
+  - [7. Локальный fallback через Minikube image](#7-локальный-fallback-через-minikube-image)
+- [Docker image и GitHub Container Registry](#docker-image-и-github-container-registry)
+- [Kubernetes manifests и overlays](#kubernetes-manifests-и-overlays)
+- [Makefile](#makefile)
+- [Логи и отладка](#логи-и-отладка)
+- [Конфигурация](#конфигурация)
+- [Данные и артефакты](#данные-и-артефакты)
+- [Структура проекта](#структура-проекта)
+- [Архитектура приложения](#архитектура-приложения)
+- [Типовые проблемы](#типовые-проблемы)
+- [Интерфейсы проекта](#интерфейсы-проекта)
+
+---
+
+# Быстрый старт
+
+## 1. Активировать окружение
+
+Linux / WSL:
+
+```bash
+conda activate dist-churn-pred-env
+```
+
+Windows:
+
+```powershell
+conda activate dist-churn-pred-env
+```
+
+Если окружение ещё не создано, см. раздел [Установка окружения](#установка-окружения).
+
+---
+
+## 2. Проверить локальный `pandas`-режим
+
+```bash
+python -m src.presentation.cli.main health --profile pandas
+python -m src.presentation.cli.main run-pipeline --profile pandas --execute
+```
+
+---
+
+## 3. Проверить локальный `dask_local`-режим
+
+```bash
+python -m src.presentation.cli.main health --profile dask_local
+python -m src.presentation.cli.main run-pipeline --profile dask_local --execute
+```
+
+---
+
+## 4. Запустить `dask_k8s` через GHCR image
+
+Основной Kubernetes-вариант предполагает, что Docker image уже опубликован в GitHub Container Registry и доступен Kubernetes-кластеру.
+
+```bash
+make k8s-apply-storage
+make k8s-recreate-cluster
+make k8s-run-job
+```
+
+По умолчанию используется overlay:
+
+```text
+K8S_OVERLAY=ghcr
+```
+
+Он берёт image из GitHub Container Registry.
+
+Перед первым запуском проверь, что Kubernetes может скачать image:
+
+```bash
+docker pull ghcr.io/skerter/distributed-churn-prediction:<release-tag>
+```
+
+Пример:
+
+```bash
+docker pull ghcr.io/skerter/distributed-churn-prediction:v0.1.0
+```
+
+Если image приватный и pull завершается ошибкой `unauthorized`, нужно либо сделать package публичным, либо настроить `imagePullSecret`.
+
+---
+
+## 5. Запустить `dask_k8s` через локальный image в Minikube
+
+Это запасной режим для быстрой отладки, когда не хочется ждать сборку и публикацию image через GitHub Actions.
+
+Важно: для локального Kubernetes-запуска недостаточно выполнить обычный `docker build` в Docker Desktop. Image должен быть доступен именно внутри Docker daemon Minikube.
+
+Собрать image прямо внутрь Minikube:
+
+```bash
+make minikube-build
+```
+
+Эта команда выполняет примерно следующее:
+
+```bash
+eval $(minikube docker-env)
+docker build -t dcp-pipeline:latest .
+```
+
+После этого можно запускать локальный overlay:
+
+```bash
+make k8s-apply-storage
+make k8s-recreate-cluster K8S_OVERLAY=minikube-local
+make k8s-run-job K8S_OVERLAY=minikube-local
+```
+
+Когда закончишь работу с Minikube Docker daemon и захочешь вернуть обычный Docker daemon:
+
+```bash
+eval $(minikube docker-env -u)
+```
+
+---
+
+# Установка с нуля
+
+Ниже описан полный набор инструментов, который нужен для всех режимов проекта.
+
+## Системные инструменты
+
+| Инструмент | Для чего нужен |
+|---|---|
+| Git | Клонирование репозитория и работа с ветками |
+| Conda / Miniconda / Mambaforge | Python-окружение проекта |
+| Docker Desktop / Docker Engine | Сборка и запуск container images |
+| WSL Ubuntu | Linux-среда на Windows |
+| Minikube | Локальный Kubernetes-кластер |
+| kubectl | Управление Kubernetes |
+| Helm 3 | Установка Kubernetes charts |
+| make | Автоматизация команд проекта |
+| curl, ca-certificates | Скачивание файлов и TLS |
+
+Ubuntu / WSL:
+
+```bash
+sudo apt update
+sudo apt install -y git make curl ca-certificates
+```
+
+Проверить инструменты:
+
+```bash
+git --version
+make --version
+docker --version
+kubectl version --client
+minikube version
+helm version
+```
+
+---
+
+## Клонирование репозитория
+
+```bash
+git clone https://github.com/Skerter/distributed-churn-prediction.git
+cd distributed-churn-prediction
+```
+
+Переключиться на рабочую ветку:
+
+```bash
+git checkout make-k8s-pipeline-v1
+```
+
+---
+
+# Установка окружения
+
+## Linux / WSL
 
 ```bash
 conda env create -f environment_linux.yml
 conda activate dist-churn-pred-env
 ```
 
-### Windows
+## Windows
 
-```bash
+```powershell
 conda env create -f environment.yml
 conda activate dist-churn-pred-env
 ```
 
----
-
-## Запуск CLI
-
-Сейчас CLI — основная рабочая точка входа в проект.
-
-### Проверка состояния приложения
+## Проверка Python-зависимостей
 
 ```bash
-python -m src.churn.presentation.cli.main health --profile pandas
+python -c "import pandas, dask, distributed, xgboost, pyarrow, kagglehub, coloredlogs; print('env ok')"
 ```
 
-### Просмотр объединённого конфига
+## Основные библиотеки
+
+Полный список зависимостей находится в `environment.yml` и `environment_linux.yml`.
+
+Ключевые библиотеки:
+
+| Библиотека | Назначение |
+|---|---|
+| `pandas` | Локальная обработка данных |
+| `dask` | Распределённые вычисления |
+| `distributed` | Dask scheduler/client/workers |
+| `dask-kubernetes` | Интеграция Dask и Kubernetes |
+| `xgboost` | ML-модель и distributed training |
+| `scikit-learn` | Метрики, split, вспомогательные ML-инструменты |
+| `pyarrow` | Parquet |
+| `kagglehub` | Загрузка Kaggle-датасета |
+| `coloredlogs` | Цветное логирование |
+| `pyyaml` | YAML-конфиги |
+| `matplotlib`, `seaborn` | Графики |
+| `kubernetes`, `kopf`, `kr8s` | Kubernetes tooling |
+
+---
+
+# Runtime-профили
+
+Все три режима выполняют один и тот же смысловой pipeline: загрузка данных, обработка признаков, обучение и оценка модели. Разница в том, где и как выполняются вычисления.
+
+| Профиль | Где выполняется | Что показывает |
+|---|---|---|
+| `pandas` | Один Python-процесс на одной машине | Базовая локальная реализация без распределённых вычислений |
+| `dask_local` | Локальный Dask `LocalCluster` | Переход от обычного DataFrame к распределённой обработке на одной машине |
+| `dask_k8s` | Dask scheduler/workers в Kubernetes + pipeline Job | Production-like подход: отдельные pod'ы, registry image, shared storage, Kubernetes orchestration |
+
+## Зачем нужны все три режима
+
+Проект специально сохраняет все режимы, чтобы было видно преимущество распределённой архитектуры.
+
+`pandas` даёт простую точку отсчёта:
+
+```text
+один процесс
+одна машина
+простая отладка
+минимум инфраструктуры
+```
+
+`dask_local` показывает первый шаг к распределённости:
+
+```text
+локальный scheduler
+локальные workers
+Dask DataFrame
+распределённое обучение через xgboost.dask
+```
+
+`dask_k8s` показывает более зрелую схему:
+
+```text
+Docker image
+GitHub Container Registry
+Kubernetes DaskCluster
+scheduler pod
+worker pods
+pipeline Job
+PVC storage
+```
+
+Так можно сравнивать не только ML-качество, но и инженерные свойства:
+
+- воспроизводимость;
+- масштабируемость;
+- изоляция окружения;
+- управление ресурсами;
+- удобство деплоя;
+- переносимость между окружениями.
+
+---
+
+# CLI
+
+CLI поддерживает три команды:
+
+```text
+health
+show-config
+run-pipeline
+```
+
+## Health-check
 
 ```bash
-python -m src.churn.presentation.cli.main show-config --profile pandas
+python -m src.presentation.cli.main health --profile pandas
+python -m src.presentation.cli.main health --profile dask_local
+python -m src.presentation.cli.main health --profile dask_k8s
 ```
 
-### Dry-run пайплайна
+Для `dask_k8s` health-check требует доступный Dask scheduler, потому что профиль подключается к внешнему scheduler по адресу из конфига.
+
+## Посмотреть итоговый конфиг
 
 ```bash
-python -m src.churn.presentation.cli.main run-pipeline --profile pandas
+python -m src.presentation.cli.main show-config --profile pandas
+python -m src.presentation.cli.main show-config --profile dask_local
+python -m src.presentation.cli.main show-config --profile dask_k8s
 ```
 
-### Реальный запуск pandas pipeline
+## Dry-run
 
 ```bash
-python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute
+python -m src.presentation.cli.main run-pipeline --profile pandas
+python -m src.presentation.cli.main run-pipeline --profile dask_local
 ```
 
-### Реальный запуск dask_local pipeline
+Для `dask_k8s` dry-run может попытаться подключиться к scheduler на этапе bootstrap, поэтому для проверки без Kubernetes лучше использовать `pandas` или `dask_local`.
+
+## Полный запуск
 
 ```bash
-python -m src.churn.presentation.cli.main run-pipeline --profile dask_local --execute
+python -m src.presentation.cli.main run-pipeline --profile pandas --execute
+python -m src.presentation.cli.main run-pipeline --profile dask_local --execute
 ```
 
-### Запуск с пропуском отдельных шагов
+Kubernetes-режим обычно запускается через Kubernetes Job:
 
 ```bash
-python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute --skip-load
-python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute --skip-features
-python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute --skip-train
-python -m src.churn.presentation.cli.main run-pipeline --profile pandas --execute --skip-eval
+make k8s-run-job
 ```
 
-Это полезно, когда часть артефактов уже существует и не нужно пересчитывать весь граф заново.
+## Skip-флаги
+
+```bash
+python -m src.presentation.cli.main run-pipeline --profile pandas --execute --skip-load
+python -m src.presentation.cli.main run-pipeline --profile pandas --execute --skip-features
+python -m src.presentation.cli.main run-pipeline --profile pandas --execute --skip-train
+python -m src.presentation.cli.main run-pipeline --profile pandas --execute --skip-eval
+```
+
+Пример комбинированного запуска:
+
+```bash
+python -m src.presentation.cli.main run-pipeline \
+  --profile dask_local \
+  --execute \
+  --skip-load \
+  --skip-features
+```
 
 ---
 
-## Что создаётся в ходе работы
+# Dask Kubernetes
 
-### Исходные данные
+## Общая схема
 
-- `data/source/Train.csv`
-- `data/source/Test.csv`
+```text
+Docker image
+→ GitHub Container Registry
+→ Kubernetes
+→ Dask Operator
+→ DaskCluster
+→ scheduler pod
+→ worker pods
+→ scheduler service
+→ pipeline Job
+→ shared PVC /mnt/dcp
+```
 
-### Обработанные данные
+В Kubernetes участвуют следующие сущности:
 
-- `data/processed/train_processed.parquet`
-- `data/processed/test_processed.parquet`
-- `data/processed/target_encoding_maps.json`
-
-### Модели
-
-- pandas-режим: `models/xgboost_<version>.pkl`
-- dask_local-режим: `models/xgboost_<version>.json`
-
-### Метрики и графики
-
-- `models/*_eval_metrics.json`
-- `notebooks/eval_plots/confusion_matrix.png`
-- `notebooks/eval_plots/roc_curve.png`
-- `notebooks/eval_plots/pr_curve.png`
-
----
-
-## Особенности профилей
-
-### `pandas`
-
-Подходит для:
-
-- baseline-реализации;
-- локальной отладки логики признаков;
-- проверки корректности оркестрации шагов;
-- быстрой итерации над кодом без Dask-кластера.
-
-### `dask_local`
-
-Подходит для:
-
-- проверки перехода с локального DataFrame на распределённый DataFrame;
-- тестирования поведения шагов на Dask API;
-- локального эксперимента с распределённым обучением через `xgboost.dask`.
-
-### `dask_k8s`
-
-Это направление пока не следует считать завершённым.
-
-На текущем этапе:
-
-- есть идея и конфигурационный задел;
-- есть поддержка подключения к внешнему scheduler;
-- нет завершённой end-to-end реализации, которую можно называть стабильной Kubernetes-версией проекта.
-
-Именно поэтому `dask_k8s` следует воспринимать как **WIP**.
+| Сущность | Назначение |
+|---|---|
+| `DaskCluster` | Custom Resource, описывающий Dask scheduler и workers |
+| Dask Operator | Следит за `DaskCluster` и создаёт реальные Kubernetes pod'ы/service |
+| Scheduler pod | Центральный Dask scheduler |
+| Worker pods | Исполнители Dask-задач |
+| Scheduler service | Kubernetes service для подключения Job/client к scheduler |
+| PVC `dcp-storage` | Общее хранилище данных, моделей и логов |
+| Pipeline Job | Одноразовый запуск ML pipeline внутри Kubernetes |
 
 ---
 
-## Ограничения текущей версии
+## 1. Запуск Minikube
 
-На данный момент важно учитывать несколько практических ограничений:
+Рекомендуемый старт:
 
-1. **`dask_k8s` не завершён** — проект ещё не дошёл до стабильного распределённого запуска в Kubernetes.
-2. **CLI — единственный рабочий интерфейс** — API и Telegram Bot пока только в разработке.
-3. **Локальные baseline-метрики не стоит считать финальными production-метриками** — пайплайн ещё требует более строгой схемы валидации.
-4. **Часть артефактов сейчас генерируется прямо внутри репозитория** — для production-версии лучше вынести их в отдельное хранилище или каталоги, не попадающие в git.
-5. **Окружение чувствительно к версиям библиотек** — особенно в связке `dask`, `distributed`, `xgboost`, `pandas` и `dask-kubernetes`.
+```bash
+minikube start --driver=docker --cpus=4 --memory=8192
+```
 
----
+Проверка:
 
-## Что стоит улучшить дальше
-
-Приоритетный roadmap проекта:
-
-1. убрать leakage в feature engineering и evaluation;
-2. разделить train/validation/test более строго;
-3. добавить автоматические тесты;
-4. стабилизировать `dask_local`;
-5. довести до конца `dask_k8s` профиль;
-6. реализовать API как вторую рабочую точку входа;
-7. реализовать Telegram Bot как пользовательский интерфейс поверх application-слоя;
-8. вынести артефакты и тяжёлые файлы из git;
-9. добавить CI-проверки и smoke tests для CLI.
+```bash
+minikube status
+kubectl get nodes
+kubectl get pods
+```
 
 ---
 
-## Кому будет полезен проект
+## 2. Установка Dask Operator
 
-Этот репозиторий полезен как учебный и инженерный проект, если хочется понять:
+Dask Operator нужен, чтобы Kubernetes понимал ресурс:
 
-- как спроектировать ML-пайплайн с несколькими backend-профилями;
-- как разделить проект на слои и не смешивать orchestration с presentation;
-- как использовать bootstrap, DI container и typed settings в ML-проекте;
-- как подготовить архитектурную базу под CLI, API и Telegram Bot;
-- как плавно перейти от `pandas` к `dask` и затем к Kubernetes-сценарию.
+```yaml
+kind: DaskCluster
+```
+
+Без Dask Operator команда `kubectl apply` для `DaskCluster` не создаст scheduler/workers.
+
+Стандартный путь установки Dask Operator — через Helm chart `dask-kubernetes-operator`.
+
+Добавить Helm repo:
+
+```bash
+helm repo add dask https://helm.dask.org
+helm repo update
+```
+
+Установить operator:
+
+```bash
+helm install dask-operator dask/dask-kubernetes-operator
+```
+
+Проверить установку:
+
+```bash
+kubectl get pods | grep -i dask
+kubectl get crd | grep -i dask
+kubectl api-resources | grep -i dask
+kubectl explain daskcluster
+```
+
+Ожидается, что в кластере появились:
+
+```text
+DaskCluster CRD
+RBAC permissions
+ServiceAccount
+Dask Operator Deployment
+Dask Operator Pod
+```
+
+Проверка operator pod:
+
+```bash
+kubectl get pods
+kubectl logs deployment/dask-operator --tail=200
+```
+
+Если `deployment/dask-operator` не найден, посмотри точное имя deployment:
+
+```bash
+kubectl get deploy
+```
+
+## Важное замечание про `k8s/operator/operator.yaml`
+
+В проекте есть файл:
+
+```text
+k8s/operator/operator.yaml
+```
+
+Это не полная инструкция установки Dask Operator с нуля. Полная установка должна создать CRD, RBAC и ServiceAccount. Для чистого кластера сначала используй Helm-установку operator, а уже потом применяй manifests проекта.
 
 ---
 
-## Важное замечание
+## 3. Проверить image
 
-- **CLI** — работает.
-- **API** — в разработке.
-- **Telegram Bot** — в разработке.
-- **`dask_k8s`** — в разработке.
+Основной Kubernetes-режим рассчитан на image из GHCR.
 
-Если нужен стабильный сценарий запуска прямо сейчас, ориентироваться стоит на `pandas`, `dask_local` и CLI-интерфейс.
+Проверить pull:
+
+```bash
+docker pull ghcr.io/skerter/distributed-churn-prediction:<release-tag>
+```
+
+Пример:
+
+```bash
+docker pull ghcr.io/skerter/distributed-churn-prediction:v0.1.0
+```
+
+Если package публичный, Kubernetes сможет скачать image без `imagePullSecret`.
+
+Если package приватный, нужно создать secret:
+
+```bash
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=<github_username> \
+  --docker-password=<github_pat> \
+  --docker-email=<email>
+```
+
+После этого secret нужно добавить в pod spec scheduler/workers/job через `imagePullSecrets`.
+
+---
+
+## 4. Применить PVC
+
+```bash
+make k8s-apply-storage
+```
+
+Вручную:
+
+```bash
+kubectl apply -f k8s/base/cluster/pvc.yaml
+kubectl get pvc
+```
+
+Ожидаемый статус:
+
+```text
+dcp-storage   Bound
+```
+
+---
+
+## 5. Запустить DaskCluster
+
+Основной GHCR-режим:
+
+```bash
+make k8s-recreate-cluster
+```
+
+Вручную:
+
+```bash
+kubectl delete daskcluster dcp-cluster --ignore-not-found=true
+kubectl apply -k k8s/overlays/ghcr/cluster
+kubectl get pods -l dask.org/cluster-name=dcp-cluster -w
+```
+
+Ожидаемые pod'ы:
+
+```text
+dcp-cluster-scheduler                                1/1 Running
+dcp-cluster-default-worker-group-worker-...          1/1 Running
+dcp-cluster-default-worker-group-worker-...          1/1 Running
+```
+
+Первый pull image может занимать несколько минут. Это нормально для тяжёлого Python/conda image.
+
+---
+
+## 6. Запустить pipeline Job
+
+```bash
+make k8s-run-job
+```
+
+Вручную:
+
+```bash
+kubectl delete job dcp-pipeline-job --ignore-not-found=true
+kubectl apply -k k8s/overlays/ghcr/job
+kubectl logs job/dcp-pipeline-job -f
+```
+
+Job запускает:
+
+```bash
+python -m src.presentation.cli.main run-pipeline --profile dask_k8s --execute
+```
+
+---
+
+## 7. Локальный fallback через Minikube image
+
+Если нужно быстро проверить локальные изменения без GHCR:
+
+```bash
+make minikube-build
+make k8s-recreate-cluster K8S_OVERLAY=minikube-local
+make k8s-run-job K8S_OVERLAY=minikube-local
+```
+
+Что важно:
+
+```text
+make minikube-build
+```
+
+собирает image именно внутри Docker daemon Minikube. Если собрать image обычным `docker build` без `eval $(minikube docker-env)`, Kubernetes внутри Minikube может его не увидеть.
+
+Проверить image внутри Minikube:
+
+```bash
+eval $(minikube docker-env)
+docker images | grep dcp-pipeline
+```
+
+Вернуться к обычному Docker daemon:
+
+```bash
+eval $(minikube docker-env -u)
+```
+
+---
+
+# Docker image и GitHub Container Registry
+
+## Dockerfile
+
+`Dockerfile` описывает runtime image проекта.
+
+Внутри image:
+
+```text
+/app/src
+/app/configs
+conda env: dist-churn-pred-env
+PYTHONPATH=/app
+```
+
+Один и тот же image используется для:
+
+```text
+Dask scheduler
+Dask workers
+pipeline Job
+```
+
+Это важно: scheduler, workers и pipeline Job должны иметь одинаковые версии `dask`, `distributed`, `xgboost`, `pandas`, `pyarrow` и проектного кода.
+
+---
+
+## GHCR
+
+Docker images публикуются в GitHub Container Registry:
+
+```text
+ghcr.io/skerter/distributed-churn-prediction
+```
+
+Для стабильных запусков рекомендуется использовать release-tag:
+
+```text
+ghcr.io/skerter/distributed-churn-prediction:v0.1.0
+```
+
+Именно release-tag должен использоваться в Kubernetes manifests, когда нужна воспроизводимость.
+
+## GitHub Actions
+
+Workflow:
+
+```text
+.github/workflows/docker-ghcr.yml
+```
+
+Он автоматизирует сборку и публикацию image.
+
+Общая логика:
+
+```text
+push / manual workflow run
+→ checkout
+→ docker login ghcr.io
+→ docker build
+→ smoke test
+→ docker push
+```
+
+Для обычного рабочего запуска Kubernetes должен ссылаться на заранее выбранный release-tag. Если release-tag меняется, обнови image в GHCR overlay.
+
+---
+
+# Kubernetes manifests и overlays
+
+Проект использует Kustomize. Он встроен в `kubectl`, поэтому отдельная установка обычно не нужна.
+
+## Структура
+
+```text
+k8s/
+├── base/
+│   ├── cluster/
+│   │   ├── dask-cluster.yaml
+│   │   ├── pvc.yaml
+│   │   └── kustomization.yaml
+│   └── job/
+│       ├── pipeline-job.yaml
+│       └── kustomization.yaml
+└── overlays/
+    ├── ghcr/
+    │   ├── cluster/
+    │   │   └── kustomization.yaml
+    │   └── job/
+    │       └── kustomization.yaml
+    └── minikube-local/
+        ├── cluster/
+        │   └── kustomization.yaml
+        └── job/
+            └── kustomization.yaml
+```
+
+## Base
+
+Base содержит общий Kubernetes spec:
+
+```text
+PVC
+DaskCluster
+Pipeline Job
+volumeMounts
+ports
+args
+service
+```
+
+В base используется placeholder-image:
+
+```yaml
+image: dcp-pipeline:base
+imagePullPolicy: IfNotPresent
+```
+
+Base напрямую обычно не запускается. Конкретный image выбирает overlay.
+
+## `ghcr` overlay
+
+Используется для запуска из registry.
+
+```bash
+kubectl apply -k k8s/overlays/ghcr/cluster
+kubectl apply -k k8s/overlays/ghcr/job
+```
+
+## `minikube-local` overlay
+
+Используется для локального image:
+
+```bash
+kubectl apply -k k8s/overlays/minikube-local/cluster
+kubectl apply -k k8s/overlays/minikube-local/job
+```
+
+Перед этим нужно выполнить:
+
+```bash
+make minikube-build
+```
+
+## Проверить итоговые manifests
+
+GHCR:
+
+```bash
+make k8s-render-cluster
+make k8s-render-job
+```
+
+Локальный fallback:
+
+```bash
+make k8s-render-cluster K8S_OVERLAY=minikube-local
+make k8s-render-job K8S_OVERLAY=minikube-local
+```
+
+---
+
+# Makefile
+
+`Makefile` — основной интерфейс для повторяющихся команд.
+
+## Основные команды
+
+| Команда | Что делает |
+|---|---|
+| `make minikube-build` | Собирает `dcp-pipeline:latest` внутри Minikube Docker daemon |
+| `make local-build` | Собирает image в текущем Docker daemon |
+| `make k8s-apply-storage` | Применяет PVC |
+| `make k8s-recreate-cluster` | Пересоздаёт DaskCluster через выбранный overlay |
+| `make k8s-run-job` | Перезапускает pipeline Job через выбранный overlay |
+| `make k8s-clean-job` | Удаляет pipeline Job |
+| `make k8s-status` | Показывает состояние DaskCluster, pods, services, jobs, PVC |
+| `make k8s-render-cluster` | Показывает итоговый cluster manifest после Kustomize |
+| `make k8s-render-job` | Показывает итоговый job manifest после Kustomize |
+
+## Выбор overlay
+
+Основной режим:
+
+```bash
+make k8s-recreate-cluster
+make k8s-run-job
+```
+
+Локальный fallback:
+
+```bash
+make minikube-build
+make k8s-recreate-cluster K8S_OVERLAY=minikube-local
+make k8s-run-job K8S_OVERLAY=minikube-local
+```
+
+---
+
+# Логи и отладка
+
+## Job logs
+
+Основная команда для просмотра stdout pipeline Job:
+
+```bash
+make k8s-logs
+```
+
+Вручную:
+
+```bash
+kubectl logs job/dcp-pipeline-job -f
+```
+
+## Application log
+
+Основной файловый лог внутри Kubernetes:
+
+```text
+/mnt/dcp/logs/app.log
+```
+
+Команды:
+
+```bash
+make k8s-app-log-tail
+make k8s-app-log
+make k8s-clear-app-log
+```
+
+`k8s-app-log-tail` показывает последние строки, `k8s-app-log` следит за логом в live-режиме, `k8s-clear-app-log` очищает файл.
+
+## Dashboard
+
+```bash
+make k8s-dashboard-forward
+```
+
+Открыть:
+
+```text
+http://localhost:8787
+```
+
+## Scheduler port-forward
+
+```bash
+make k8s-scheduler-forward
+```
+
+После этого локальный клиент может подключиться к:
+
+```text
+tcp://localhost:8786
+```
+
+## PVC check
+
+```bash
+make k8s-storage-check
+```
+
+Эта команда создаёт тестовый файл в `/mnt/dcp` через scheduler pod. Затем можно проверить его из worker pod.
+
+---
+
+# Конфигурация
+
+Базовый конфиг:
+
+```text
+configs/base.yaml
+```
+
+Профильные конфиги:
+
+```text
+configs/pandas.yaml
+configs/dask_local.yaml
+configs/dask_k8s.yaml
+```
+
+## Kubernetes config
+
+`configs/dask_k8s.yaml` использует абсолютные пути внутри pod'ов:
+
+```yaml
+paths:
+  data_source: "/mnt/dcp/data/source"
+  data_processed: "/mnt/dcp/data/processed"
+  models: "/mnt/dcp/models"
+  logs: "/mnt/dcp/logs"
+  notebooks: "/mnt/dcp/notebooks"
+
+dask:
+  scheduler_address: "tcp://dcp-cluster-service:8786"
+```
+
+Внутри Kubernetes нельзя использовать:
+
+```text
+tcp://localhost:8786
+```
+
+Потому что `localhost` внутри Job pod означает сам Job pod, а не Dask scheduler.
+
+---
+
+# Данные и артефакты
+
+## Локальные режимы
+
+Обычно артефакты пишутся в:
+
+```text
+data/source
+data/processed
+models
+logs
+notebooks
+```
+
+## Kubernetes-режим
+
+Артефакты пишутся в PVC:
+
+```text
+/mnt/dcp/data/source
+/mnt/dcp/data/processed
+/mnt/dcp/models
+/mnt/dcp/logs
+/mnt/dcp/notebooks
+```
+
+Это позволяет pipeline Job, scheduler и workers видеть одни и те же данные.
+
+---
+
+# Структура проекта
+
+```text
+distributed-churn-prediction/
+├── configs/
+│   ├── base.yaml
+│   ├── pandas.yaml
+│   ├── dask_local.yaml
+│   └── dask_k8s.yaml
+├── k8s/
+│   ├── base/
+│   │   ├── cluster/
+│   │   └── job/
+│   ├── overlays/
+│   │   ├── ghcr/
+│   │   └── minikube-local/
+│   └── operator/
+├── src/
+│   ├── app/
+│   ├── application/
+│   ├── infrastructure/
+│   ├── orchestration/
+│   └── presentation/
+├── Dockerfile
+├── Makefile
+├── environment.yml
+├── environment_linux.yml
+└── README.md
+```
+
+---
+
+# Архитектура приложения
+
+Проект использует layered architecture.
+
+```text
+presentation
+→ application
+→ orchestration
+→ infrastructure
+→ app/bootstrap
+```
+
+## `presentation`
+
+Точки входа в приложение. Сейчас основная рабочая точка входа — CLI:
+
+```text
+src/presentation/cli
+```
+
+CLI:
+
+1. читает аргументы;
+2. вызывает bootstrap;
+3. запускает use case;
+4. печатает JSON-ответ.
+
+## `application`
+
+Прикладной слой:
+
+```text
+src/application
+```
+
+Содержит:
+
+- DTO;
+- use cases;
+- services для dataset, features, train, evaluate.
+
+## `orchestration`
+
+Слой pipeline-сценариев:
+
+```text
+src/orchestration/pipelines
+```
+
+Содержит:
+
+- pandas pipeline;
+- dask local pipeline;
+- dask k8s pipeline.
+
+## `infrastructure`
+
+Технический слой:
+
+- загрузка конфигов;
+- Dask client;
+- логирование;
+- storage/path utils.
+
+## `app`
+
+Композиционный слой:
+
+- `bootstrap()`;
+- container;
+- typed settings.
+
+---
+
+# Типовые проблемы
+
+## Pod долго висит в `ContainerCreating`
+
+Посмотреть events:
+
+```bash
+kubectl describe pod dcp-cluster-scheduler
+```
+
+Если видно только:
+
+```text
+Pulling image ...
+```
+
+и ошибок нет, image просто скачивается. Первый pull может занимать несколько минут.
+
+## `ImagePullBackOff` или `ErrImagePull`
+
+Проверить pull:
+
+```bash
+docker pull ghcr.io/skerter/distributed-churn-prediction:<release-tag>
+```
+
+Если ошибка `unauthorized`, image приватный. Сделай package public или настрой `imagePullSecret`.
+
+## `DaskCluster` не создаёт scheduler/workers
+
+Проверить operator:
+
+```bash
+kubectl get crd | grep -i dask
+kubectl get pods | grep -i operator
+kubectl logs deployment/dask-operator --tail=200
+```
+
+Проверить events:
+
+```bash
+kubectl describe daskcluster dcp-cluster
+kubectl get events --sort-by='.lastTimestamp' | tail -50
+```
+
+## Job не может подключиться к scheduler
+
+Проверь `configs/dask_k8s.yaml`:
+
+```yaml
+dask:
+  scheduler_address: "tcp://dcp-cluster-service:8786"
+```
+
+Если там `localhost`, Job будет пытаться подключиться к самому себе.
+
+## PVC не монтируется
+
+Проверить PVC:
+
+```bash
+kubectl get pvc
+kubectl describe pvc dcp-storage
+```
+
+Ожидается:
+
+```text
+Bound
+```
+
+## Kubernetes не видит локальный image
+
+Если используешь `K8S_OVERLAY=minikube-local`, image должен быть собран внутри Minikube:
+
+```bash
+make minikube-build
+```
+
+Проверка:
+
+```bash
+eval $(minikube docker-env)
+docker images | grep dcp-pipeline
+```
+
+---
+
+# Интерфейсы проекта
+
+Сейчас в проекте предусмотрены три интерфейсных направления:
+
+| Интерфейс | Назначение |
+|---|---|
+| CLI | Основная рабочая точка входа |
+| API | Планируемый программный интерфейс |
+| Telegram Bot | Планируемый пользовательский интерфейс |
+
+На текущем этапе основной рабочий интерфейс — CLI.

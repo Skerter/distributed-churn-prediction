@@ -12,7 +12,7 @@ spec:
       labels:
         app: dask-operator
     spec:
-      serviceAccountName: dask-operator-dask-kubernetes-operator
+      serviceAccountName: dask-operator-dask-kubernetes-operator  # TODO: добавить в README инструкцию по созданию dask-operator
       containers:
         - name: operator
           image: ghcr.io/dask/dask-kubernetes-operator:latest
