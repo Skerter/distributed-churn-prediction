@@ -9,4 +9,4 @@ paths:
   notebooks: "/mnt/dcp/notebooks"
 
 dask:
-  scheduler_address: "tcp://localhost:8786"
+  scheduler_address: "tcp://dcp-cluster-service:8786"

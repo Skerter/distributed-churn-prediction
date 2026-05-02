@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dcp-pipeline-job
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: dcp-pipeline
+        component: pipeline-job
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: dcp-pipeline
+          image: dcp-pipeline:latest
+          imagePullPolicy: IfNotPresent
+
+          args:
+            - python
+            - -m
+            - src.presentation.cli.main
+            - run-pipeline
+            - --profile
+            - dask_k8s
+            - --execute
+
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: PYTHONPATH
+              value: "/app"
+
+          volumeMounts:
+            - name: dcp-storage
+              mountPath: /mnt/dcp
+
+      volumes:
+        - name: dcp-storage
+          persistentVolumeClaim:
+            claimName: dcp-storage
