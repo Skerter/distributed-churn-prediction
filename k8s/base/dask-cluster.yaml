@@ -8,8 +8,8 @@ spec:
     spec:
       containers:
         - name: worker
-          image: dcp-pipeline:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/skerter/distributed-churn-prediction:make-k8s-pipeline-v1
+          imagePullPolicy: Always
           args:
             - dask-worker
             - --name
@@ -33,8 +33,8 @@ spec:
     spec:
       containers:
         - name: scheduler
-          image: dcp-pipeline:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/skerter/distributed-churn-prediction:make-k8s-pipeline-v1
+          imagePullPolicy: Always
           args:
             - dask-scheduler
           ports:
