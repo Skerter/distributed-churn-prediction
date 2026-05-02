@@ -1,6 +1,12 @@
 runtime:
   mode: "dask_k8s"
 
+paths:
+  data_source: "/mnt/dcp/data/source"
+  data_processed: "/mnt/dcp/data/processed"
+  models: "/mnt/dcp/models"
+  logs: "/mnt/dcp/logs"
+  notebooks: "/mnt/dcp/notebooks"
+
 dask:
-  # Адрес уебищный поменять на более понятный
-  scheduler_address: "tcp://churn-cluster-scheduler:8786" 
+  scheduler_address: "tcp://localhost:8786"

@@ -1,0 +1,89 @@
+apiVersion: kubernetes.dask.org/v1
+kind: DaskCluster
+metadata:
+  annotations:
+    kopf.zalando.org/last-handled-configuration: |
+      {"spec":{"idleTimeout":0,"scheduler":{"service":{"ports":[{"name":"tcp-comm","port":8786,"protocol":"TCP","targetPort":"tcp-comm"},{"name":"http-dashboard","port":8787,"protocol":"TCP","targetPort":"http-dashboard"}],"selector":{"dask.org/cluster-name":"dcp-cluster","dask.org/component":"scheduler"},"type":"NodePort"},"spec":{"containers":[{"args":["dask-scheduler"],"image":"docker.io/library/dcp:latest","imagePullPolicy":"IfNotPresent","livenessProbe":{"httpGet":{"path":"/health","port":"http-dashboard"},"initialDelaySeconds":15,"periodSeconds":20},"name":"scheduler","ports":[{"containerPort":8786,"name":"tcp-comm","protocol":"TCP"},{"containerPort":8787,"name":"http-dashboard","protocol":"TCP"}],"readinessProbe":{"httpGet":{"path":"/health","port":"http-dashboard"},"initialDelaySeconds":5,"periodSeconds":10}}]}},"worker":{"replicas":2,"spec":{"containers":[{"args":["dask-worker","--name","$(DASK_WORKER_NAME)","--dashboard","--dashboard-address","8788"],"image":"docker.io/library/dcp:latest","imagePullPolicy":"IfNotPresent","name":"worker","ports":[{"containerPort":8788,"name":"http-dashboard","protocol":"TCP"}]}]}}}}
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"kubernetes.dask.org/v1","kind":"DaskCluster","metadata":{"annotations":{},"name":"dcp-cluster","namespace":"default"},"spec":{"scheduler":{"service":{"ports":[{"name":"tcp-comm","port":8786,"protocol":"TCP","targetPort":"tcp-comm"},{"name":"http-dashboard","port":8787,"protocol":"TCP","targetPort":"http-dashboard"}],"selector":{"dask.org/cluster-name":"dcp-cluster","dask.org/component":"scheduler"},"type":"NodePort"},"spec":{"containers":[{"args":["dask-scheduler"],"image":"docker.io/library/dcp:latest","imagePullPolicy":"IfNotPresent","livenessProbe":{"httpGet":{"path":"/health","port":"http-dashboard"},"initialDelaySeconds":15,"periodSeconds":20},"name":"scheduler","ports":[{"containerPort":8786,"name":"tcp-comm","protocol":"TCP"},{"containerPort":8787,"name":"http-dashboard","protocol":"TCP"}],"readinessProbe":{"httpGet":{"path":"/health","port":"http-dashboard"},"initialDelaySeconds":5,"periodSeconds":10}}]}},"worker":{"replicas":2,"spec":{"containers":[{"args":["dask-worker","--name","$(DASK_WORKER_NAME)","--dashboard","--dashboard-address","8788"],"image":"docker.io/library/dcp:latest","imagePullPolicy":"IfNotPresent","name":"worker","ports":[{"containerPort":8788,"name":"http-dashboard","protocol":"TCP"}]}]}}}}
+  creationTimestamp: "2026-04-02T21:13:56Z"
+  generation: 1
+  name: dcp-cluster
+  namespace: default
+  resourceVersion: "100922"
+  uid: 3d616eb6-88a9-4857-942d-cac26598989b
+spec:
+  idleTimeout: 0
+  scheduler:
+    service:
+      ports:
+      - name: tcp-comm
+        port: 8786
+        protocol: TCP
+        targetPort: tcp-comm
+      - name: http-dashboard
+        port: 8787
+        protocol: TCP
+        targetPort: http-dashboard
+      selector:
+        dask.org/cluster-name: dcp-cluster
+        dask.org/component: scheduler
+      type: NodePort
+    spec:
+      volumes:
+      - name: dcp-storage
+        persistentVolumeClaim:
+          claimName: dcp-storage
+      containers:
+      - args:
+        - dask-scheduler
+        image: docker.io/library/dcp:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http-dashboard
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        volumeMounts:
+        - name: dcp-storage
+          mountPath: /mnt/dcp
+        name: scheduler
+        ports:
+        - containerPort: 8786
+          name: tcp-comm
+          protocol: TCP
+        - containerPort: 8787
+          name: http-dashboard
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http-dashboard
+          initialDelaySeconds: 5
+          periodSeconds: 10
+  worker:
+    replicas: 2
+    spec:
+      volumes:
+      - name: dcp-storage
+        persistentVolumeClaim:
+          claimName: dcp-storage
+      containers:
+      - args:
+        - dask-worker
+        - --name
+        - $(DASK_WORKER_NAME)
+        - --dashboard
+        - --dashboard-address
+        - "8788"
+        image: docker.io/library/dcp:latest
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: dcp-storage
+          mountPath: mnt/dcp
+        name: worker
+        ports:
+        - containerPort: 8788
+          name: http-dashboard
+          protocol: TCP
