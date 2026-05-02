@@ -13,6 +13,7 @@ COPY configs /app/configs
 ENV MAMBA_DOCKERFILE_ACTIVATE=1
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+ENV PATH=/opt/conda/envs/dist-churn-pred-env/bin:$PATH
 
 SHELL ["micromamba", "run", "-n", "dist-churn-pred-env", "/bin/bash", "-c"]
 
