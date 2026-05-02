@@ -25,49 +25,56 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set image metadata
+      - name: Set image tag
         id: meta
+        shell: bash
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            VERSION_TAG="${GITHUB_REF_NAME}"
+            IMAGE_TAG="${GITHUB_REF_NAME}"
           else
             SAFE_BRANCH="${GITHUB_REF_NAME//\//-}"
-            VERSION_TAG="${SAFE_BRANCH}-${SHORT_SHA}"
+            IMAGE_TAG="${SAFE_BRANCH}-${SHORT_SHA}"
           fi
 
-          echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
+        shell: bash
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
             -u "${{ github.actor }}" \
             --password-stdin
 
       - name: Build image
+        shell: bash
         run: |
           docker build \
-            -t "${IMAGE_NAME}:${{ steps.meta.outputs.version_tag }}" \
+            -t "${IMAGE_NAME}:${{ steps.meta.outputs.image_tag }}" \
             -t "${IMAGE_NAME}:latest" \
             .
 
       - name: Smoke test image
+        shell: bash
         run: |
-          docker run --rm "${IMAGE_NAME}:${{ steps.meta.outputs.version_tag }}" \
+          docker run --rm "${IMAGE_NAME}:${{ steps.meta.outputs.image_tag }}" \
             python -c "import dask, distributed, pandas, pyarrow, xgboost, coloredlogs, kagglehub; print('ghcr image ok')"
 
-      - name: Push version tag
+      - name: Push versioned image
+        shell: bash
         run: |
-          docker push "${IMAGE_NAME}:${{ steps.meta.outputs.version_tag }}"
+          docker push "${IMAGE_NAME}:${{ steps.meta.outputs.image_tag }}"
 
-      - name: Push latest for main only
+      - name: Push latest image for main
         if: github.ref == 'refs/heads/main'
+        shell: bash
         run: |
           docker push "${IMAGE_NAME}:latest"
 
-      - name: Print image
+      - name: Print image reference
+        shell: bash
         run: |
           echo "Pushed image:"
-          echo "${IMAGE_NAME}:${{ steps.meta.outputs.version_tag }}"
+          echo "${IMAGE_NAME}:${{ steps.meta.outputs.image_tag }}"
