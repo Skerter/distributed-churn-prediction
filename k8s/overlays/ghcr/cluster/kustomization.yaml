@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../base/cluster
+
+patches:
+  - target:
+      group: kubernetes.dask.org
+      version: v1
+      kind: DaskCluster
+      name: dcp-cluster
+    patch: |-
+      - op: replace
+        path: /spec/worker/spec/containers/0/image
+        value: ghcr.io/skerter/distributed-churn-prediction:make-k8s-pipeline-v1
+      - op: replace
+        path: /spec/worker/spec/containers/0/imagePullPolicy
+        value: Always
+      - op: replace
+        path: /spec/scheduler/spec/containers/0/image
+        value: ghcr.io/skerter/distributed-churn-prediction:make-k8s-pipeline-v1
+      - op: replace
+        path: /spec/scheduler/spec/containers/0/imagePullPolicy
+        value: Always

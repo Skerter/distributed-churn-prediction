@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../base/cluster
+
+patches:
+  - target:
+      group: kubernetes.dask.org
+      version: v1
+      kind: DaskCluster
+      name: dcp-cluster
+    patch: |-
+      - op: replace
+        path: /spec/worker/spec/containers/0/image
+        value: dcp-pipeline:latest
+      - op: replace
+        path: /spec/worker/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+      - op: replace
+        path: /spec/scheduler/spec/containers/0/image
+        value: dcp-pipeline:latest
+      - op: replace
+        path: /spec/scheduler/spec/containers/0/imagePullPolicy
+        value: IfNotPresent

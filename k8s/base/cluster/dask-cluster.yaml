@@ -1,0 +1,84 @@
+apiVersion: kubernetes.dask.org/v1
+kind: DaskCluster
+metadata:
+  name: dcp-cluster
+spec:
+  worker:
+    replicas: 2
+    spec:
+      containers:
+        - name: worker
+          image: dcp-pipeline:base
+          imagePullPolicy: IfNotPresent
+          args:
+            - dask-worker
+            - --name
+            - $(DASK_WORKER_NAME)
+            - --dashboard
+            - --dashboard-address
+            - "8788"
+          ports:
+            - name: http-dashboard
+              containerPort: 8788
+              protocol: TCP
+          volumeMounts:
+            - name: dcp-storage
+              mountPath: /mnt/dcp
+      volumes:
+        - name: dcp-storage
+          persistentVolumeClaim:
+            claimName: dcp-storage
+
+  scheduler:
+    spec:
+      containers:
+        - name: scheduler
+          image: dcp-pipeline:base
+          imagePullPolicy: IfNotPresent
+          args:
+            - dask-scheduler
+          ports:
+            - name: tcp-comm
+              containerPort: 8786
+              protocol: TCP
+            - name: http-dashboard
+              containerPort: 8787
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              port: http-dashboard
+              path: /health
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              port: http-dashboard
+              path: /health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: dcp-storage
+              mountPath: /mnt/dcp
+      volumes:
+        - name: dcp-storage
+          persistentVolumeClaim:
+            claimName: dcp-storage
+
+    service:
+      type: NodePort
+      selector:
+        dask.org/cluster-name: dcp-cluster
+        dask.org/component: scheduler
+      ports:
+        - name: tcp-comm
+          protocol: TCP
+          port: 8786
+          targetPort: tcp-comm
+        - name: http-dashboard
+          protocol: TCP
+          port: 8787
+          targetPort: http-dashboard

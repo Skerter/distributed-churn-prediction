@@ -249,7 +249,7 @@ def evaluate_pandas_model(settings: Settings, logger: Logger) -> dict[str, Any]:
     return metrics
 
 
-def evaluate_dask_local_model(
+def evaluate_dask_model(
     settings: Settings,
     logger: Logger,
     client,

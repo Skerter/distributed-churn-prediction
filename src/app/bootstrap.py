@@ -24,7 +24,7 @@ def bootstrap(profile: str = "pandas") -> AppContainer:
 
     ensure_project_dirs(settings)
     logger = build_logger(settings)
-    backend = resolve_backend(settings.runtime.mode)
+    backend = resolve_backend(settings.runtime.mode) # TODO Тут тож убрать потом
     dask_client = create_dask_client(settings, logger)
 
     pipeline_registry = {

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../base/job
+
+patches:
+  - target:
+      group: batch
+      version: v1
+      kind: Job
+      name: dcp-pipeline-job
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: dcp-pipeline:latest
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent

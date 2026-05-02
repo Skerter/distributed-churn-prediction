@@ -1,0 +1,100 @@
+name: Build and publish Docker image to GHCR
+
+on:
+  push:
+    branches:
+      - main
+      - make-k8s-pipeline-v1
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/skerter/distributed-churn-prediction
+
+jobs:
+  build-and-push:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare image tags
+        id: tags
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          SHA_TAG="sha-${SHORT_SHA}"
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            PRIMARY_TAG="${GITHUB_REF_NAME}"
+            BRANCH_TAG=""
+          else
+            BRANCH_TAG="${GITHUB_REF_NAME//\//-}"
+            PRIMARY_TAG="${BRANCH_TAG}"
+          fi
+
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+          echo "primary_tag=${PRIMARY_TAG}" >> "$GITHUB_OUTPUT"
+          echo "branch_tag=${BRANCH_TAG}" >> "$GITHUB_OUTPUT"
+
+          echo "Prepared tags:"
+          echo "  primary_tag=${PRIMARY_TAG}"
+          echo "  sha_tag=${SHA_TAG}"
+          echo "  branch_tag=${BRANCH_TAG}"
+
+      - name: Login to GHCR
+        shell: bash
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+            -u "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Build image
+        shell: bash
+        run: |
+          docker build \
+            -t "${IMAGE_NAME}:${{ steps.tags.outputs.primary_tag }}" \
+            -t "${IMAGE_NAME}:${{ steps.tags.outputs.sha_tag }}" \
+            .
+
+      - name: Smoke test image
+        shell: bash
+        run: |
+          docker run --rm "${IMAGE_NAME}:${{ steps.tags.outputs.sha_tag }}" \
+            python -c "import dask, distributed, pandas, pyarrow, xgboost, coloredlogs, kagglehub; print('ghcr image ok')"
+
+      - name: Push primary tag
+        shell: bash
+        run: |
+          docker push "${IMAGE_NAME}:${{ steps.tags.outputs.primary_tag }}"
+
+      - name: Push commit SHA tag
+        shell: bash
+        run: |
+          docker push "${IMAGE_NAME}:${{ steps.tags.outputs.sha_tag }}"
+
+      - name: Push latest for main
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          docker tag "${IMAGE_NAME}:${{ steps.tags.outputs.sha_tag }}" "${IMAGE_NAME}:latest"
+          docker push "${IMAGE_NAME}:latest"
+
+      - name: Print image references
+        shell: bash
+        run: |
+          echo "Pushed images:"
+          echo "  ${IMAGE_NAME}:${{ steps.tags.outputs.primary_tag }}"
+          echo "  ${IMAGE_NAME}:${{ steps.tags.outputs.sha_tag }}"
+
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "  ${IMAGE_NAME}:latest"
+          fi

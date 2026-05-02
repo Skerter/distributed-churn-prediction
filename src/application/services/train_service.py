@@ -310,7 +310,7 @@ def train_pandas_model(settings: Settings, logger: Logger) -> dict[str, object]:
     }
 
 
-def train_dask_local_model(
+def train_dask_model(
     settings: Settings,
     logger: Logger,
     client,
@@ -448,5 +448,4 @@ def train_dask_local_model(
         "val_target_rate": val_target_rate,
         "best_iteration": int(best_iteration) if best_iteration is not None else None,
         "validation_source": str(valid_processed_path),
-        "leakage_safe": True,
     }
