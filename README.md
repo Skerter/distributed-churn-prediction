@@ -224,12 +224,6 @@ git clone https://github.com/Skerter/distributed-churn-prediction.git
 cd distributed-churn-prediction
 ```
 
-Переключиться на рабочую ветку:
-
-```bash
-git checkout make-k8s-pipeline-v1
-```
-
 ---
 
 # Установка окружения
@@ -509,16 +503,6 @@ kubectl logs deployment/dask-operator --tail=200
 kubectl get deploy
 ```
 
-## Важное замечание про `k8s/operator/operator.yaml`
-
-В проекте есть файл:
-
-```text
-k8s/operator/operator.yaml
-```
-
-Это не полная инструкция установки Dask Operator с нуля. Полная установка должна создать CRD, RBAC и ServiceAccount. Для чистого кластера сначала используй Helm-установку operator, а уже потом применяй manifests проекта.
-
 ---
 
 ## 3. Проверить image
@@ -641,6 +625,7 @@ make minikube-build
 ```
 
 собирает image именно внутри Docker daemon Minikube. Если собрать image обычным `docker build` без `eval $(minikube docker-env)`, Kubernetes внутри Minikube может его не увидеть.
+Загрузка образа из обычного Docker в Docker daemon Minikube очень долгая, не рекомендуется. 
 
 Проверить image внутри Minikube:
 
