@@ -14,8 +14,8 @@ spec:
 
       containers:
         - name: dcp-pipeline
-          image: ghcr.io/skerter/distributed-churn-prediction:make-k8s-pipeline-v1
-          imagePullPolicy: Always
+          image: dcp-pipeline:base
+          imagePullPolicy: IfNotPresent
 
           args:
             - python
