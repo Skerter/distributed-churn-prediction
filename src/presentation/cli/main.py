@@ -23,6 +23,7 @@ def main() -> int:
     container = None
 
     try:
+        # BUG: Запуск в режиме dry-run с профилем dask_k8s может привести к ошибкам из-за невозможности подключения к кластеру. Рекомендуется использовать профиль dask_local для dry-run.
         if args.command == "run-pipeline" and args.profile == "dask_k8s" and not args.execute:
             print("[WARNING] Запуск в режиме dry-run с профилем dask_k8s может привести к ошибкам из-за невозможности подключения к кластеру. Рекомендуется использовать профиль dask_local для dry-run.",
                   file=sys.stderr)
