@@ -41,5 +41,30 @@ class RunPipelineApiResponse(BaseModel):
     result: Any | None = None
 
 
+class ProfileApiItem(BaseModel):
+    name: str
+    runtime_mode: str
+    backend: str
+    web_enabled: bool
+    description: str
+    warning: str | None = None
+
+
+class ProfilesApiResponse(BaseModel):
+    default_profile: str
+    profiles: list[ProfileApiItem]
+
+
+class ConfigSummaryApiResponse(BaseModel):
+    app: dict[str, Any]
+    runtime: dict[str, Any]
+    backend: str
+    model: dict[str, Any]
+    data: dict[str, Any]
+    dask: dict[str, Any]
+    pipeline: dict[str, Any]
+    paths: dict[str, Any]
+
+
 class ErrorApiResponse(BaseModel):
     detail: str

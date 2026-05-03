@@ -52,3 +52,59 @@ class RunPipelineResponse:
             "message": self.message,
             "result": self.result,
         }
+
+
+@dataclass(slots=True)
+class ProfileInfo:
+    name: str
+    runtime_mode: str
+    backend: str
+    web_enabled: bool
+    description: str
+    warning: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "runtime_mode": self.runtime_mode,
+            "backend": self.backend,
+            "web_enabled": self.web_enabled,
+            "description": self.description,
+            "warning": self.warning,
+        }
+
+
+@dataclass(slots=True)
+class ProfilesResponse:
+    default_profile: str
+    profiles: list[ProfileInfo]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "default_profile": self.default_profile,
+            "profiles": [profile.to_dict() for profile in self.profiles],
+        }
+
+
+@dataclass(slots=True)
+class ConfigSummaryResponse:
+    app: dict[str, Any]
+    runtime: dict[str, Any]
+    backend: str
+    model: dict[str, Any]
+    data: dict[str, Any]
+    dask: dict[str, Any]
+    pipeline: dict[str, Any]
+    paths: dict[str, Any]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "app": self.app,
+            "runtime": self.runtime,
+            "backend": self.backend,
+            "model": self.model,
+            "data": self.data,
+            "dask": self.dask,
+            "pipeline": self.pipeline,
+            "paths": self.paths,
+        }

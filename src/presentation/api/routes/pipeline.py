@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -24,6 +25,12 @@ def run_pipeline_endpoint(request: RunPipelineApiRequest) -> dict:
     container = None
 
     try:
+        if request.profile == "dask_k8s":
+            print("[WARNING] Запуск pipeline с профилем dask_k8s может привести к ошибкам из-за невозможности подключения к кластеру. Рекомендуется использовать профиль dask_local для запуска pipeline.",
+                  file=sys.stderr)
+            raise ChurnAppError(
+                "Запуск pipeline с профилем dask_k8s не поддерживается из-за возможных проблем с подключением к кластеру. Пожалуйста, используйте профиль dask_local для запуска pipeline."
+            )
         container = bootstrap(profile=request.profile)
 
         use_case_request = RunPipelineRequest(

@@ -25,6 +25,10 @@ def health(
     container = None
 
     try:
+        if profile == "dask_k8s":
+            raise ChurnAppError(
+                "Профиль dask_k8s не поддерживается для проверки состояния из-за возможных проблем с подключением к кластеру. Пожалуйста, используйте профиль dask_local или pandas для проверки состояния."
+            )
         container = bootstrap(profile=profile)
         response = get_health(container)
         return response.to_dict()
