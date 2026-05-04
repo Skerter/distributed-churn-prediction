@@ -66,5 +66,14 @@ class ConfigSummaryApiResponse(BaseModel):
     paths: dict[str, Any]
 
 
+class ModelInfoApiResponse(BaseModel):
+    profile: str
+    mode: str
+    backend: str
+    model: dict[str, Any]
+    artifacts: dict[str, Any]
+    metrics: dict[str, Any] | None = None
+
+
 class ErrorApiResponse(BaseModel):
     detail: str
