@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 
 from fastapi import APIRouter, HTTPException, Query, status
 
@@ -25,11 +26,14 @@ def health(
     container = None
 
     try:
+        init_dask_client = True
+
         if profile == "dask_k8s":
-            raise ChurnAppError(
-                "Профиль dask_k8s не поддерживается для проверки состояния из-за возможных проблем с подключением к кластеру. Пожалуйста, используйте профиль dask_local или pandas для проверки состояния."
-            )
-        container = bootstrap(profile=profile)
+            print("[WARNING] Инициализация Dask client пропущена для профиля dask_k8s, так как он требует специфической настройки Kubernetes кластера. Пожалуйста, убедитесь, что ваш кластер настроен и доступен для использования Dask.",
+                  file=sys.stderr)
+            init_dask_client = False
+
+        container = bootstrap(profile=profile, init_dask_client=init_dask_client)
         response = get_health(container)
         return response.to_dict()
 

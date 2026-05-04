@@ -26,13 +26,14 @@ def config_summary(
     container = None
 
     try:
+        init_dask_client = True
+
         if profile == "dask_k8s":
-            print("[WARNING] Получение сводки конфигурации для профиля dask_k8s может привести к ошибкам из-за невозможности подключения к кластеру. Рекомендуется использовать профиль dask_local для получения сводки конфигурации.",
+            print("[WARNING] Инициализация Dask client пропущена для профиля dask_k8s, так как он требует специфической настройки Kubernetes кластера. Пожалуйста, убедитесь, что ваш кластер настроен и доступен для использования Dask.",
                   file=sys.stderr)
-            raise ChurnAppError(
-                "Получение сводки конфигурации для профиля dask_k8s не поддерживается из-за возможных проблем с подключением к кластеру. Пожалуйста, используйте профиль dask_local для получения сводки конфигурации."
-            )
-        container = bootstrap(profile=profile)
+            init_dask_client = False
+    
+        container = bootstrap(profile=profile, init_dask_client=init_dask_client)
         response = get_config_summary(container)
         return response.to_dict()
 
