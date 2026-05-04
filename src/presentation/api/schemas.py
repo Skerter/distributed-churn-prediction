@@ -71,6 +71,32 @@ class ModelInfoApiResponse(BaseModel):
     metrics: dict[str, Any] | None = None
 
 
+class CreatePipelineRunApiRequest(BaseModel):
+    execute: bool = Field(
+        default=True,
+        description="Если true — pipeline будет запущен. Если false — dry-run.",
+    )
+    skip_load: bool = False
+    skip_features: bool = False
+    skip_train: bool = False
+    skip_eval: bool = False
+
+
+class PipelineRunApiResponse(BaseModel):
+    run_id: str
+    status: str
+    profile: str
+    executor: str
+    created_at: str
+    updated_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    request: dict[str, Any]
+    result: Any | None = None
+    error: str | None = None
+    metadata: dict[str, Any]
+
+
 class ErrorApiBody(BaseModel):
     code: str
     message: str

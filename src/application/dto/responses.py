@@ -127,3 +127,37 @@ class ModelInfoResponse:
             "artifacts": self.artifacts,
             "metrics": self.metrics,
         }
+
+
+@dataclass(slots=True)
+class PipelineRunResponse:
+    """Ответ с состоянием асинхронного pipeline run."""
+
+    run_id: str
+    status: str
+    profile: str
+    executor: str
+    created_at: str
+    updated_at: str
+    request: dict[str, Any]
+    started_at: str | None = None
+    finished_at: str | None = None
+    result: Any | None = None
+    error: str | None = None
+    metadata: dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "run_id": self.run_id,
+            "status": self.status,
+            "profile": self.profile,
+            "executor": self.executor,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "request": self.request,
+            "result": self.result,
+            "error": self.error,
+            "metadata": self.metadata or {},
+        }

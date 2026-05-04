@@ -14,3 +14,14 @@ def get_container(request: Request) -> AppContainer:
         raise RuntimeError("AppContainer не инициализирован")
 
     return container
+
+
+def get_pipeline_executor(request: Request):
+    """Возвращает executor для асинхронных pipeline runs."""
+
+    executor = getattr(request.app.state, "pipeline_executor", None)
+
+    if executor is None:
+        raise RuntimeError("Pipeline executor не инициализирован")
+
+    return executor
