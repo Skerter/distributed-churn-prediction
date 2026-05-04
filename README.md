@@ -31,27 +31,51 @@ pandas
 hamzaghanmi/expresso-churn-prediction-challenge
 ```
 
-Основной рабочий интерфейс сейчас — CLI:
+Основные рабочие интерфейсы сейчас — CLI и Web API:
 
 ```bash
 python -m src.presentation.cli.main <command> --profile <profile>
+```
+
+```bash
+python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ---
 
 ## Навигация
 
+- [Distributed Churn Prediction](#distributed-churn-prediction)
+  - [Коротко о проекте](#коротко-о-проекте)
+  - [Навигация](#навигация)
 - [Быстрый старт](#быстрый-старт)
   - [1. Активировать окружение](#1-активировать-окружение)
-  - [2. Проверить локальный pandas-режим](#2-проверить-локальный-pandas-режим)
-  - [3. Проверить локальный dask_local-режим](#3-проверить-локальный-dask_local-режим)
-  - [4. Запустить dask_k8s через GHCR image](#4-запустить-dask_k8s-через-ghcr-image)
-  - [5. Запустить dask_k8s через локальный image в Minikube](#5-запустить-dask_k8s-через-локальный-image-в-minikube)
+  - [2. Проверить локальный `pandas`-режим](#2-проверить-локальный-pandas-режим)
+  - [3. Проверить локальный `dask_local`-режим](#3-проверить-локальный-dask_local-режим)
+  - [4. Запустить `dask_k8s` через GHCR image](#4-запустить-dask_k8s-через-ghcr-image)
+  - [5. Запустить `dask_k8s` через локальный image в Minikube](#5-запустить-dask_k8s-через-локальный-image-в-minikube)
 - [Установка с нуля](#установка-с-нуля)
+  - [Системные инструменты](#системные-инструменты)
+  - [Клонирование репозитория](#клонирование-репозитория)
 - [Установка окружения](#установка-окружения)
+  - [Linux / WSL](#linux--wsl)
+  - [Windows](#windows)
+  - [Проверка Python-зависимостей](#проверка-python-зависимостей)
+  - [Основные библиотеки](#основные-библиотеки)
 - [Runtime-профили](#runtime-профили)
+  - [Зачем нужны все три режима](#зачем-нужны-все-три-режима)
 - [CLI](#cli)
+  - [Health-check](#health-check)
+  - [Посмотреть итоговый конфиг](#посмотреть-итоговый-конфиг)
+  - [Dry-run](#dry-run)
+  - [Полный запуск](#полный-запуск)
+  - [Skip-флаги](#skip-флаги)
+- [Web API](#web-api)
+  - [Запуск локально](#запуск-локально)
+  - [Основные endpoints](#основные-endpoints)
+  - [Запуск pipeline через run\_id](#запуск-pipeline-через-run_id)
 - [Dask Kubernetes](#dask-kubernetes)
+  - [Общая схема](#общая-схема)
   - [1. Запуск Minikube](#1-запуск-minikube)
   - [2. Установка Dask Operator](#2-установка-dask-operator)
   - [3. Проверить image](#3-проверить-image)
@@ -60,14 +84,43 @@ python -m src.presentation.cli.main <command> --profile <profile>
   - [6. Запустить pipeline Job](#6-запустить-pipeline-job)
   - [7. Локальный fallback через Minikube image](#7-локальный-fallback-через-minikube-image)
 - [Docker image и GitHub Container Registry](#docker-image-и-github-container-registry)
+  - [Dockerfile](#dockerfile)
+  - [GHCR](#ghcr)
+  - [GitHub Actions](#github-actions)
 - [Kubernetes manifests и overlays](#kubernetes-manifests-и-overlays)
+  - [Структура](#структура)
+  - [Base](#base)
+  - [`ghcr` overlay](#ghcr-overlay)
+  - [`minikube-local` overlay](#minikube-local-overlay)
+  - [Проверить итоговые manifests](#проверить-итоговые-manifests)
 - [Makefile](#makefile)
+  - [Основные команды](#основные-команды)
+  - [Выбор overlay](#выбор-overlay)
 - [Логи и отладка](#логи-и-отладка)
+  - [Job logs](#job-logs)
+  - [Application log](#application-log)
+  - [Dashboard](#dashboard)
+  - [Scheduler port-forward](#scheduler-port-forward)
+  - [PVC check](#pvc-check)
 - [Конфигурация](#конфигурация)
+  - [Kubernetes config](#kubernetes-config)
 - [Данные и артефакты](#данные-и-артефакты)
+  - [Локальные режимы](#локальные-режимы)
+  - [Kubernetes-режим](#kubernetes-режим)
 - [Структура проекта](#структура-проекта)
 - [Архитектура приложения](#архитектура-приложения)
+  - [`presentation`](#presentation)
+  - [`application`](#application)
+  - [`orchestration`](#orchestration)
+  - [`infrastructure`](#infrastructure)
+  - [`app`](#app)
 - [Типовые проблемы](#типовые-проблемы)
+  - [Pod долго висит в `ContainerCreating`](#pod-долго-висит-в-containercreating)
+  - [`ImagePullBackOff` или `ErrImagePull`](#imagepullbackoff-или-errimagepull)
+  - [`DaskCluster` не создаёт scheduler/workers](#daskcluster-не-создаёт-schedulerworkers)
+  - [Job не может подключиться к scheduler](#job-не-может-подключиться-к-scheduler)
+  - [PVC не монтируется](#pvc-не-монтируется)
+  - [Kubernetes не видит локальный image](#kubernetes-не-видит-локальный-image)
 - [Интерфейсы проекта](#интерфейсы-проекта)
 
 ---
@@ -394,6 +447,128 @@ python -m src.presentation.cli.main run-pipeline \
   --skip-load \
   --skip-features
 ```
+
+---
+
+# Web API
+
+API — это тонкий presentation layer над тем же core, что и CLI:
+
+```text
+HTTP request
+→ FastAPI route
+→ AppContainer
+→ use case
+→ pipeline executor
+```
+
+Активный runtime-профиль выбирается через переменную окружения `DCP_PROFILE`.
+
+## Запуск локально
+
+Windows cmd:
+
+```cmd
+cd C:\vs_code_projects\distributed-churn-prediction
+conda activate dist-churn-pred-env
+set DCP_PROFILE=pandas
+python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+PowerShell:
+
+```powershell
+cd C:\vs_code_projects\distributed-churn-prediction
+conda activate dist-churn-pred-env
+$env:DCP_PROFILE="pandas"
+python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Swagger UI:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+## Основные endpoints
+
+| Endpoint | Метод | Назначение |
+|---|---:|---|
+| `/health` | GET | Проверить состояние приложения |
+| `/profiles` | GET | Посмотреть доступные runtime-профили |
+| `/config/summary` | GET | Посмотреть безопасную сводку конфигурации |
+| `/model/info` | GET | Проверить наличие модели и метрик |
+| `/pipeline/runs` | POST | Создать запуск pipeline и получить `run_id` |
+| `/pipeline/runs/{run_id}` | GET | Проверить состояние запуска |
+
+## Запуск pipeline через run_id
+
+В Web API pipeline запускается не через долгий блокирующий HTTP-запрос, а через `run_id`.
+
+Схема:
+
+```text
+POST /pipeline/runs
+→ API создаёт run_id
+→ pipeline запускается в background executor
+→ GET /pipeline/runs/{run_id} показывает статус
+```
+
+Создать dry-run через Swagger UI:
+
+```json
+{
+  "execute": false,
+  "skip_load": false,
+  "skip_features": false,
+  "skip_train": false,
+  "skip_eval": false
+}
+```
+
+Создать реальный запуск:
+
+```json
+{
+  "execute": true,
+  "skip_load": false,
+  "skip_features": false,
+  "skip_train": false,
+  "skip_eval": false
+}
+```
+
+Ответ содержит `run_id`:
+
+```json
+{
+  "run_id": "20260504-153012-pandas-a1b2c3d4",
+  "status": "queued",
+  "profile": "pandas",
+  "executor": "web"
+}
+```
+
+Проверить статус:
+
+```text
+http://127.0.0.1:8000/pipeline/runs/<run_id>
+```
+
+Файлы состояния запусков сохраняются в:
+
+```text
+logs/pipeline_runs
+```
+
+Типовые статусы:
+
+| Статус | Значение |
+|---|---|
+| `queued` | Запуск создан |
+| `running` | Pipeline выполняется |
+| `succeeded` | Pipeline завершился успешно |
+| `failed` | Pipeline завершился ошибкой |
 
 ---
 
@@ -1027,10 +1202,11 @@ presentation
 
 ## `presentation`
 
-Точки входа в приложение. Сейчас основная рабочая точка входа — CLI:
+Точки входа в приложение:
 
 ```text
 src/presentation/cli
+src/presentation/api
 ```
 
 CLI:
@@ -1039,6 +1215,15 @@ CLI:
 2. вызывает bootstrap;
 3. запускает use case;
 4. печатает JSON-ответ.
+
+Web API:
+
+1. принимает HTTP-запрос;
+2. использует `AppContainer`, созданный при старте приложения;
+3. вызывает application use cases;
+4. возвращает JSON-ответ.
+
+Для запуска pipeline в Web API используется workflow с `run_id`: API создаёт запуск, возвращает идентификатор, а состояние проверяется отдельным GET-запросом.
 
 ## `application`
 
@@ -1177,12 +1362,12 @@ docker images | grep dcp-pipeline
 
 # Интерфейсы проекта
 
-Сейчас в проекте предусмотрены три интерфейсных направления:
+Сейчас в проекте есть несколько интерфейсных направлений:
 
-| Интерфейс | Назначение |
-|---|---|
-| CLI | Основная рабочая точка входа |
-| API | Планируемый программный интерфейс |
-| Telegram Bot | Планируемый пользовательский интерфейс |
+| Интерфейс | Статус | Назначение |
+|---|---|---|
+| CLI | Реализован | Локальный запуск и отладка pipeline |
+| Web API | Реализован | HTTP-интерфейс для health-check, конфигурации, модели и запуска pipeline через `run_id` |
+| Telegram Bot | Планируется | Пользовательский интерфейс поверх application layer |
 
-На текущем этапе основной рабочий интерфейс — CLI.
+CLI и Web API используют один и тот же core: `bootstrap`, `AppContainer`, application use cases и pipeline'ы.
