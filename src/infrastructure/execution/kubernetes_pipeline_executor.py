@@ -6,7 +6,7 @@ from uuid import uuid4
 from src.application.dto.requests import CreatePipelineRunRequest
 from src.app.settings import Settings
 from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
-from src.shared.enums import PipelineRunStatus
+from src.shared.enums import PipelineExecutorKind, PipelineRunStatus
 
 
 def _utc_now_iso() -> str:
@@ -47,7 +47,7 @@ class KubernetesJobPipelineExecutor:
             "run_id": run_id,
             "status": PipelineRunStatus.QUEUED.value,
             "profile": self.settings.api.kubernetes.pipeline_profile,
-            "executor": "kubernetes_job",
+            "executor": PipelineExecutorKind.KUBERNETES_JOB.value,
             "created_at": now,
             "updated_at": now,
             "started_at": None,
