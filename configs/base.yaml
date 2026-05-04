@@ -1,6 +1,6 @@
 app:
   name: "distributed-churn-prediction"
-  version: "0.4.0"
+  version: "v0.2.0"
 
 paths:
   data_source: "data/source"
@@ -65,3 +65,16 @@ training:
 
 evaluation:
   top_fraction: 0.1
+
+api:
+  pipeline_executor: "web"
+  max_concurrent_pipeline_runs: 1
+
+  kubernetes:
+    namespace: "default"
+    job_name_prefix: "dcp-pipeline"
+    job_image: "dcp-pipeline:latest"
+    image_pull_policy: "IfNotPresent"
+    storage_pvc_name: "dcp-storage"
+    storage_mount_path: "/mnt/dcp"
+    pipeline_profile: "dask_k8s"

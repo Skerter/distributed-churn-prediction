@@ -49,9 +49,10 @@ def create_dask_client(settings: Settings, logger) -> Any | None:
 
 def close_dask_client(client: Any | None, logger) -> None:
     """Закрывает Dask client, если он был создан.
-    params:
+
+    Args:
         client (Any | None): Экземпляр Dask client, который нужно закрыть, или None, если режим pandas.
-        logger: Логгер для записи информации о процессе закрытия Dask client.
+        logger (logging.Logger): Логгер для записи информации о процессе закрытия Dask client.
     """
     if client is None:
         return

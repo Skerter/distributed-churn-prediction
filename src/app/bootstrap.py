@@ -9,11 +9,12 @@ from src.infrastructure.logging.factory import build_logger
 from src.infrastructure.storage.paths import ensure_project_dirs
 
 
-def bootstrap(profile: str = "pandas") -> AppContainer:
+def bootstrap(profile: str = "pandas", init_dask_client: bool = True) -> AppContainer:
     """Инициализирует и настраивает контейнер приложения, который управляет зависимостями и конфигурацией для построения и выполнения pipeline.
 
     Args:
         profile (str, optional): Профиль конфигурации, определяющий набор настроек для приложения. По умолчанию "pandas".
+        init_dask_client (bool, optional): Флаг, указывающий, нужно ли инициализировать Dask клиент. По умолчанию True.
 
     Returns:
         AppContainer: Контейнер, содержащий все инициализированные компоненты приложения, такие как настройки, логгер, бэкенд и Dask клиент.
@@ -25,7 +26,16 @@ def bootstrap(profile: str = "pandas") -> AppContainer:
     ensure_project_dirs(settings)
     logger = build_logger(settings)
     backend = resolve_backend(settings.runtime.mode) # TODO Тут тож убрать потом
-    dask_client = create_dask_client(settings, logger)
+
+    if init_dask_client:
+        dask_client = create_dask_client(settings, logger)
+    else:
+        logger.info(
+            "Инициализация Dask client пропущена: profile=%s mode=%s",
+            profile,
+            settings.runtime.mode.value,
+        )
+        dask_client = None
 
     pipeline_registry = {
         "pandas": "src.orchestration.pipelines.pandas.PandasPipeline",
