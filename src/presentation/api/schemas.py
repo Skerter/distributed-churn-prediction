@@ -14,10 +14,6 @@ class HealthApiResponse(BaseModel):
 
 
 class RunPipelineApiRequest(BaseModel):
-    profile: str = Field(
-        default="pandas",
-        description="Runtime profile: pandas, dask_local или dask_k8s.",
-    )
     execute: bool = Field(
         default=False,
         description=(
@@ -75,5 +71,11 @@ class ModelInfoApiResponse(BaseModel):
     metrics: dict[str, Any] | None = None
 
 
+class ErrorApiBody(BaseModel):
+    code: str
+    message: str
+
+
 class ErrorApiResponse(BaseModel):
-    detail: str
+    success: bool = False
+    error: ErrorApiBody

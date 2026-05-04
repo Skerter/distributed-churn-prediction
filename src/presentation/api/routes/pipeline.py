@@ -1,17 +1,15 @@
 from __future__ import annotations
-import sys
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends
 
-from src.app.bootstrap import bootstrap
+from src.app.container import AppContainer
 from src.application.dto.requests import RunPipelineRequest
 from src.application.use_cases.run_pipeline import run_pipeline
-from src.infrastructure.execution.dask_client import close_dask_client
+from src.presentation.api.dependencies import get_container
 from src.presentation.api.schemas import (
     RunPipelineApiRequest,
     RunPipelineApiResponse,
 )
-from src.shared.exceptions import ChurnAppError
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
@@ -21,42 +19,20 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
     response_model=RunPipelineApiResponse,
     summary="Запустить ML pipeline",
 )
-def run_pipeline_endpoint(request: RunPipelineApiRequest) -> dict:
-    container = None
+def run_pipeline_endpoint(
+    request: RunPipelineApiRequest,
+    container: AppContainer = Depends(get_container),
+) -> dict:
+    profile = container.settings.runtime.mode.value
 
-    try:
-        if request.profile == "dask_k8s":
-            print("[WARNING] Запуск pipeline с профилем dask_k8s может привести к ошибкам из-за невозможности подключения к кластеру. Рекомендуется использовать профиль dask_local для запуска pipeline.",
-                  file=sys.stderr)
-            raise ChurnAppError(
-                "Запуск pipeline с профилем dask_k8s не поддерживается из-за возможных проблем с подключением к кластеру. Пожалуйста, используйте профиль dask_local для запуска pipeline."
-            )
-        container = bootstrap(profile=request.profile)
+    use_case_request = RunPipelineRequest(
+        profile=profile,
+        execute=request.execute,
+        skip_load=request.skip_load,
+        skip_features=request.skip_features,
+        skip_train=request.skip_train,
+        skip_eval=request.skip_eval,
+    )
 
-        use_case_request = RunPipelineRequest(
-            profile=request.profile,
-            execute=request.execute,
-            skip_load=request.skip_load,
-            skip_features=request.skip_features,
-            skip_train=request.skip_train,
-            skip_eval=request.skip_eval,
-        )
-
-        response = run_pipeline(container, use_case_request)
-        return response.to_dict()
-
-    except ChurnAppError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Внутренняя ошибка API: {exc}",
-        ) from exc
-
-    finally:
-        if container is not None:
-            close_dask_client(container.dask_client, container.logger)
+    response = run_pipeline(container, use_case_request)
+    return response.to_dict()
