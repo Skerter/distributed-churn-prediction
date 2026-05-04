@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.shared.enums import RuntimeMode
+from src.shared.enums import RuntimeMode, PipelineExecutorKind
 from src.shared.exceptions import ConfigError
 
 
@@ -91,6 +91,24 @@ class TrainingSettings:
 @dataclass(slots=True)
 class EvaluationSettings:
     top_fraction: float = 0.1
+    
+
+@dataclass(slots=True)
+class ApiKubernetesSettings:
+    namespace: str
+    job_name_prefix: str
+    job_image: str
+    image_pull_policy: str
+    storage_pvc_name: str
+    storage_mount_path: str
+    pipeline_profile: str
+
+
+@dataclass(slots=True)
+class ApiSettings:
+    pipeline_executor: PipelineExecutorKind
+    max_concurrent_pipeline_runs: int
+    kubernetes: ApiKubernetesSettings
 
 
 @dataclass(slots=True)
@@ -116,6 +134,7 @@ class Settings:
     preprocessing: PreprocessingSettings
     training: TrainingSettings
     evaluation: EvaluationSettings
+    api: ApiSettings
 
     @property
     def data_source_dir(self) -> Path:
@@ -203,6 +222,19 @@ class Settings:
             "evaluation": {
                 "top_fraction": self.evaluation.top_fraction,
             },
+            "api": {
+                "pipeline_executor": self.api.pipeline_executor.value,
+                "max_concurrent_pipeline_runs": self.api.max_concurrent_pipeline_runs,
+                "kubernetes": {
+                    "namespace": self.api.kubernetes.namespace,
+                    "job_name_prefix": self.api.kubernetes.job_name_prefix,
+                    "job_image": self.api.kubernetes.job_image,
+                    "image_pull_policy": self.api.kubernetes.image_pull_policy,
+                    "storage_pvc_name": self.api.kubernetes.storage_pvc_name,
+                    "storage_mount_path": self.api.kubernetes.storage_mount_path,
+                    "pipeline_profile": self.api.kubernetes.pipeline_profile,
+                },
+            },
         }
 
     @classmethod
@@ -219,6 +251,8 @@ class Settings:
             preprocessing_data = data["preprocessing"]
             training_data = data["training"]
             evaluation_data = data.get("evaluation", {})
+            api_data = data.get("api", {})
+            kubernetes_data = api_data.get("kubernetes", {})
         except KeyError as exc:
             raise ConfigError(f"В конфиге отсутствует обязательный ключ: {exc}") from exc
 
@@ -291,5 +325,22 @@ class Settings:
             ),
             evaluation=EvaluationSettings(
                 top_fraction=float(evaluation_data.get("top_fraction", 0.1)),
+            ),
+            api=ApiSettings(
+                pipeline_executor=PipelineExecutorKind(
+                    api_data.get("pipeline_executor", "local_background")
+                ),
+                max_concurrent_pipeline_runs=int(
+                    api_data.get("max_concurrent_pipeline_runs", 1)
+                ),
+                kubernetes=ApiKubernetesSettings(
+                    namespace=kubernetes_data.get("namespace", "default"),
+                    job_name_prefix=kubernetes_data.get("job_name_prefix", "dcp-pipeline"),
+                    job_image=kubernetes_data.get("job_image", "dcp-pipeline:latest"),
+                    image_pull_policy=kubernetes_data.get("image_pull_policy", "IfNotPresent"),
+                    storage_pvc_name=kubernetes_data.get("storage_pvc_name", "dcp-storage"),
+                    storage_mount_path=kubernetes_data.get("storage_mount_path", "/mnt/dcp"),
+                    pipeline_profile=kubernetes_data.get("pipeline_profile", "dask_k8s"),
+                ),
             ),
         )

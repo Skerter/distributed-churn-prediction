@@ -10,3 +10,15 @@ class RuntimeMode(str, Enum):
 class BackendKind(str, Enum):
     LOCAL = "local"
     DASK = "dask"
+
+
+class PipelineExecutorKind(str, Enum):
+    LOCAL_BACKGROUND = "local_background"
+    KUBERNETES_JOB = "kubernetes_job"
+
+
+class PipelineRunStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
