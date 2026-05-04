@@ -70,8 +70,8 @@ def create_app() -> FastAPI:
     api_app.include_router(profiles_router)
     api_app.include_router(config_router)
     api_app.include_router(model_router)
-    api_app.include_router(pipeline_router)
     api_app.include_router(pipeline_runs_router)
+    api_app.include_router(pipeline_router)
     return api_app
 
 

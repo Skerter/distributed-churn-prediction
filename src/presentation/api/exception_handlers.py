@@ -53,6 +53,19 @@ def register_exception_handlers(app: FastAPI) -> None:
             message=str(exc),
         )
 
+
+    @app.exception_handler(FileNotFoundError)
+    async def file_not_found_handler(
+        request: Request,
+        exc: FileNotFoundError,
+    ) -> JSONResponse:
+        return _error_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="NOT_FOUND",
+            message=str(exc),
+        )
+
+
     @app.exception_handler(Exception)
     async def unexpected_error_handler(
         request: Request,
