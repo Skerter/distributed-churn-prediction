@@ -67,7 +67,7 @@ evaluation:
   top_fraction: 0.1
 
 api:
-  pipeline_executor: "local_background"
+  pipeline_executor: "web"
   max_concurrent_pipeline_runs: 1
 
   kubernetes:

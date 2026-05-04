@@ -328,7 +328,7 @@ class Settings:
             ),
             api=ApiSettings(
                 pipeline_executor=PipelineExecutorKind(
-                    api_data.get("pipeline_executor", "local_background")
+                    api_data.get("pipeline_executor", "web")
                 ),
                 max_concurrent_pipeline_runs=int(
                     api_data.get("max_concurrent_pipeline_runs", 1)

@@ -6,7 +6,7 @@ import sys
 from src.app.bootstrap import bootstrap
 from src.application.dto.requests import RunPipelineRequest
 from src.application.use_cases.get_health import get_health
-from src.application.use_cases.run_pipeline import run_pipeline
+from src.application.use_cases.execute_pipeline import run_pipeline
 from src.infrastructure.execution.dask_client import close_dask_client
 from src.presentation.cli.parser import build_parser
 

@@ -5,7 +5,8 @@ from src.infrastructure.execution.kubernetes_pipeline_executor import (
     KubernetesJobPipelineExecutor,
 )
 from src.infrastructure.execution.local_pipeline_executor import (
-    LocalBackgroundPipelineExecutor,
+    CliPipelineExecutor,
+    WebPipelineExecutor,
 )
 from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
 from src.shared.enums import PipelineExecutorKind
@@ -18,8 +19,15 @@ def build_pipeline_executor(
 ):
     settings = container.settings
 
-    if settings.api.pipeline_executor == PipelineExecutorKind.LOCAL_BACKGROUND:
-        return LocalBackgroundPipelineExecutor(
+    if settings.api.pipeline_executor == PipelineExecutorKind.CLI:
+        return CliPipelineExecutor(
+            profile=settings.runtime.mode.value,
+            store=store,
+            logger=container.logger,
+        )
+
+    if settings.api.pipeline_executor == PipelineExecutorKind.WEB:
+        return WebPipelineExecutor(
             profile=settings.runtime.mode.value,
             store=store,
             logger=container.logger,

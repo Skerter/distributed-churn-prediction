@@ -13,7 +13,8 @@ class BackendKind(str, Enum):
 
 
 class PipelineExecutorKind(str, Enum):
-    LOCAL_BACKGROUND = "local_background"
+    CLI = "cli"
+    WEB = "web"
     KUBERNETES_JOB = "kubernetes_job"
 
 

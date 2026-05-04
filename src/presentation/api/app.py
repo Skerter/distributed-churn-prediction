@@ -14,7 +14,6 @@ from src.presentation.api.exception_handlers import register_exception_handlers
 from src.presentation.api.routes.config import router as config_router
 from src.presentation.api.routes.health import router as health_router
 from src.presentation.api.routes.model import router as model_router
-from src.presentation.api.routes.pipeline import router as pipeline_router
 from src.presentation.api.routes.profiles import router as profiles_router
 from src.presentation.api.routes.pipeline_runs import router as pipeline_runs_router
 
@@ -71,7 +70,6 @@ def create_app() -> FastAPI:
     api_app.include_router(config_router)
     api_app.include_router(model_router)
     api_app.include_router(pipeline_runs_router)
-    api_app.include_router(pipeline_router)
     return api_app
 
 
