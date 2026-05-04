@@ -4,9 +4,9 @@ import json
 import sys
 
 from src.app.bootstrap import bootstrap
-from src.application.dto.requests import RunPipelineRequest
+from src.application.dto.requests import ExecutePipelineRequest
 from src.application.use_cases.get_health import get_health
-from src.application.use_cases.execute_pipeline import run_pipeline
+from src.application.use_cases.execute_pipeline import execute_pipeline
 from src.infrastructure.execution.dask_client import close_dask_client
 from src.presentation.cli.parser import build_parser
 
@@ -46,7 +46,7 @@ def main() -> int:
             return 0
 
         if args.command == "run-pipeline":
-            request = RunPipelineRequest(
+            request = ExecutePipelineRequest(
                 profile=args.profile,
                 execute=args.execute,
                 skip_load=args.skip_load,
@@ -54,7 +54,7 @@ def main() -> int:
                 skip_train=args.skip_train,
                 skip_eval=args.skip_eval,
             )
-            response = run_pipeline(container, request)
+            response = execute_pipeline(container, request)
             print(json.dumps(response.to_dict(), indent=2, ensure_ascii=False))
             return 0
 

@@ -59,6 +59,7 @@ class ConfigSummaryApiResponse(BaseModel):
     data: dict[str, Any]
     dask: dict[str, Any]
     pipeline: dict[str, Any]
+    api: dict[str, Any]
     paths: dict[str, Any]
 
 

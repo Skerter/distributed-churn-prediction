@@ -37,6 +37,19 @@ def get_config_summary(container: AppContainer) -> ConfigSummaryResponse:
         pipeline={
             "default_execute": settings.pipeline.default_execute,
         },
+        api={
+            "pipeline_executor": settings.api.pipeline_executor.value,
+            "max_concurrent_pipeline_runs": settings.api.max_concurrent_pipeline_runs,
+            "kubernetes": {
+                "namespace": settings.api.kubernetes.namespace,
+                "job_name_prefix": settings.api.kubernetes.job_name_prefix,
+                "job_image": settings.api.kubernetes.job_image,
+                "image_pull_policy": settings.api.kubernetes.image_pull_policy,
+                "storage_pvc_name": settings.api.kubernetes.storage_pvc_name,
+                "storage_mount_path": settings.api.kubernetes.storage_mount_path,
+                "pipeline_profile": settings.api.kubernetes.pipeline_profile,
+            },
+        },
         paths={
             "data_source": settings.paths.data_source,
             "data_processed": settings.paths.data_processed,

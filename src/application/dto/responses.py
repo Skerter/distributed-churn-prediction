@@ -95,6 +95,7 @@ class ConfigSummaryResponse:
     data: dict[str, Any]
     dask: dict[str, Any]
     pipeline: dict[str, Any]
+    api: dict[str, Any]
     paths: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
@@ -106,6 +107,7 @@ class ConfigSummaryResponse:
             "data": self.data,
             "dask": self.dask,
             "pipeline": self.pipeline,
+            "api": self.api,
             "paths": self.paths,
         }
 
