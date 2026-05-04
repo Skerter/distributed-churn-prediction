@@ -108,3 +108,22 @@ class ConfigSummaryResponse:
             "pipeline": self.pipeline,
             "paths": self.paths,
         }
+
+@dataclass(slots=True)
+class ModelInfoResponse:
+    profile: str
+    mode: str
+    backend: str
+    model: dict[str, Any]
+    artifacts: dict[str, Any]
+    metrics: dict[str, Any] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "profile": self.profile,
+            "mode": self.mode,
+            "backend": self.backend,
+            "model": self.model,
+            "artifacts": self.artifacts,
+            "metrics": self.metrics,
+        }
