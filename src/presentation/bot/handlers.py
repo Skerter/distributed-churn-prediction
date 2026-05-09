@@ -13,7 +13,7 @@ from src.application.dto.requests import CreatePipelineRunRequest
 from src.application.use_cases.get_health import get_health
 from src.application.use_cases.get_model_info import get_model_info
 from src.application.use_cases.list_profiles import list_profiles
-from src.infrastructure.execution.local_pipeline_executor import WebPipelineExecutor
+from src.infrastructure.execution.pipeline_executor_factory import build_bot_pipeline_executor
 from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
 from src.presentation.bot.keyboards import profile_selection_keyboard
 from src.presentation.bot.messages import (
@@ -31,6 +31,7 @@ from src.presentation.bot.messages import (
     MSG_STATUS_TEMPLATE,
     MSG_WELCOME,
 )
+from src.presentation.bot.runner import watch_and_notify
 
 _STATUS_LABELS: dict[str, str] = {
     "queued": "В очереди",
@@ -155,18 +156,12 @@ async def cb_run_pipeline(
 
     await callback.answer()
 
-    executor = WebPipelineExecutor(
-        profile=profile,
-        store=run_store,
-        logger=logger,
-        max_concurrent_runs=1,
-    )
+    executor = build_bot_pipeline_executor(container=container, store=run_store)
+    chat_id = callback.from_user.id
+    timeout = container.settings.bot.pipeline_timeout_seconds
 
     try:
-        payload = await asyncio.to_thread(
-            executor.submit,
-            CreatePipelineRunRequest(execute=True),
-        )
+        payload = executor.submit(CreatePipelineRunRequest(execute=True), chat_id=chat_id)
     except RuntimeError as exc:
         if "активный pipeline run" in str(exc):
             await callback.message.answer(MSG_PIPELINE_BUSY)
@@ -177,8 +172,23 @@ async def cb_run_pipeline(
             await callback.message.answer(MSG_PIPELINE_ERROR.format(error=exc))
         return
 
+    run_id = payload["run_id"]
+    asyncio.create_task(
+        watch_and_notify(
+            run_id=run_id,
+            thread=executor.get_thread(run_id),
+            cancel_event=executor.get_cancel_event(run_id),
+            chat_id=chat_id,
+            bot=callback.bot,
+            run_store=run_store,
+            logger=logger,
+            timeout_seconds=timeout,
+            on_done=executor.cleanup,
+        )
+    )
+
     await callback.message.answer(
-        MSG_PIPELINE_STARTED.format(run_id=payload["run_id"]),
+        MSG_PIPELINE_STARTED.format(run_id=run_id),
         parse_mode="HTML",
     )
 

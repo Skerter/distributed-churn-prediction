@@ -15,6 +15,7 @@ class BackendKind(str, Enum):
 class PipelineExecutorKind(str, Enum):
     CLI = "cli"
     WEB = "web"
+    BOT = "bot"
     KUBERNETES_JOB = "kubernetes_job"
 
 

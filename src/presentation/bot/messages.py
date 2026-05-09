@@ -67,9 +67,9 @@ MSG_PROFILES_LIST = (
 MSG_SELECT_PROFILE = "Выберите профиль выполнения пайплайна:"
 
 MSG_PIPELINE_STARTED = (
-    "Пайплайн запущен в фоне.\n"
+    "Пайплайн запущен.\n"
     "run_id: <code>{run_id}</code>\n\n"
-    "Используй /status чтобы проверить статус выполнения."
+    "Получите уведомление по завершению. /status — для ручной проверки."
 )
 
 MSG_PIPELINE_BUSY = (
@@ -78,6 +78,23 @@ MSG_PIPELINE_BUSY = (
 )
 
 MSG_PIPELINE_ERROR = "Не удалось запустить пайплайн: {error}"
+
+MSG_PIPELINE_DONE = (
+    "Пайплайн завершён успешно.\n"
+    "run_id: <code>{run_id}</code>\n"
+    "Время выполнения: {duration}s"
+)
+
+MSG_PIPELINE_FAILED = (
+    "Пайплайн завершился с ошибкой.\n"
+    "run_id: <code>{run_id}</code>\n"
+    "Ошибка: <code>{error}</code>"
+)
+
+MSG_PIPELINE_TIMEOUT = (
+    "Пайплайн прерван по таймауту.\n"
+    "run_id: <code>{run_id}</code>"
+)
 
 # ---------------------------------------------------------------------------
 # /status

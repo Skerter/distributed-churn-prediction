@@ -118,11 +118,14 @@ class BotSettings:
     Args:
         admin_chat_ids (list[int]): Список Telegram user_id с доступом к боту.
             Пустой список означает, что бот доступен всем пользователям.
+        pipeline_timeout_seconds (int): Максимальное время ожидания pipeline run в секундах.
+            По истечении бот помечает run как FAILED и уведомляет пользователя.
 
     Raises:
         ConfigError: Если не удалось разрешить конфигурационные параметры.
     """
     admin_chat_ids: list[int]
+    pipeline_timeout_seconds: int = 7200
 
 
 @dataclass(slots=True)
@@ -252,6 +255,7 @@ class Settings:
             },
             "bot": {
                 "admin_chat_ids": self.bot.admin_chat_ids,
+                "pipeline_timeout_seconds": self.bot.pipeline_timeout_seconds,
             },
         }
 
@@ -364,5 +368,6 @@ class Settings:
             ),
             bot=BotSettings(
                 admin_chat_ids=list(bot_data.get("admin_chat_ids", [])),
+                pipeline_timeout_seconds=int(bot_data.get("pipeline_timeout_seconds", 7200)),
             ),
         )

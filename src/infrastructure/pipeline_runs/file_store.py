@@ -96,3 +96,17 @@ class FilePipelineRunStore:
                 return True
 
         return False
+
+    def list_active_runs(self) -> list[str]:
+        """Возвращает run_id всех незавершённых runs (QUEUED и RUNNING)."""
+        active_statuses = {
+            PipelineRunStatus.QUEUED.value,
+            PipelineRunStatus.RUNNING.value,
+        }
+        result = []
+        for path in self.root_dir.glob("*.json"):
+            with path.open("r", encoding="utf-8") as file:
+                payload = json.load(file)
+            if payload.get("status") in active_statuses:
+                result.append(payload["run_id"])
+        return result

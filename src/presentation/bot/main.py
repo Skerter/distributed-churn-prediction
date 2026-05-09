@@ -15,6 +15,16 @@ from src.presentation.bot.handlers import router
 from src.presentation.bot.middlewares import AuthMiddleware, ContainerMiddleware
 
 
+def _recover_stale_runs(run_store: FilePipelineRunStore, logger) -> None:
+    """Помечает FAILED все runs, оставшиеся в статусе QUEUED/RUNNING после рестарта бота."""
+    stale = run_store.list_active_runs()
+    for run_id in stale:
+        run_store.mark_failed(run_id, error="Прервано: бот был перезапущен")
+        logger.warning("Stale run помечен FAILED: %s", run_id)
+    if stale:
+        logger.info("Восстановлено stale runs при старте: %d", len(stale))
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Строит парсер аргументов командной строки для Telegram-бота.
 
@@ -69,6 +79,8 @@ async def _run_bot(token: str, profile: str) -> None:
     run_store = FilePipelineRunStore(
         root_dir=container.settings.logs_dir / "pipeline_runs",
     )
+
+    _recover_stale_runs(run_store, logger)
 
     bot = Bot(token=token)
     dp = Dispatcher(storage=MemoryStorage())
