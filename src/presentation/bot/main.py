@@ -6,6 +6,7 @@ import os
 import sys
 
 from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.app.bootstrap import bootstrap
 from src.infrastructure.execution.dask_client import close_dask_client
@@ -65,7 +66,7 @@ async def _run_bot(token: str, profile: str) -> None:
         logger.info("Доступ открыт для всех пользователей")
 
     bot = Bot(token=token)
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
 
     container_mw = ContainerMiddleware(container)
     auth_mw = AuthMiddleware(admin_ids, logger.getChild("auth"))

@@ -2,20 +2,30 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from src.app.container import AppContainer
 from src.presentation.bot.keyboards import profile_selection_keyboard
 from src.presentation.bot.messages import (
+    MSG_ASK_RUN_ID,
     MSG_HELP,
     MSG_MODEL_INFO,
     MSG_NOT_IMPLEMENTED,
     MSG_PROFILES_LIST,
     MSG_SELECT_PROFILE,
+    MSG_STATUS_CANCELLED,
     MSG_STATUS_NOT_FOUND,
     MSG_STATUS_TEMPLATE,
     MSG_WELCOME,
 )
+
+
+class StatusFlow(StatesGroup):
+    """Состояния диалога команды /status."""
+
+    waiting_for_run_id = State()
 
 router = Router()
 
@@ -138,32 +148,75 @@ async def cb_run_pipeline(callback: CallbackQuery, container: AppContainer) -> N
     await callback.answer()
 
 
-@router.message(Command("status"))
-async def cmd_status(message: Message, container: AppContainer) -> None:
-    """Обрабатывает команду /status. Возвращает статус запуска пайплайна.
-
-    Ожидает аргумент run_id: ``/status <run_id>``.
+@router.message(Command("cancel"))
+async def cmd_cancel(message: Message, state: FSMContext) -> None:
+    """Отменяет текущий активный диалог (например, ожидание run_id).
 
     Args:
         message (Message): Входящее сообщение Telegram.
+        state (FSMContext): Контекст FSM текущего пользователя.
+    """
+    await state.clear()
+    await message.answer(MSG_STATUS_CANCELLED)
+
+
+@router.message(Command("status"))
+async def cmd_status(message: Message, state: FSMContext) -> None:
+    """Обрабатывает команду /status. Запрашивает run_id в интерактивном диалоге.
+
+    Переводит пользователя в состояние ``StatusFlow.waiting_for_run_id``
+    и просит ввести run_id отдельным сообщением.
+
+    Args:
+        message (Message): Входящее сообщение Telegram.
+        state (FSMContext): Контекст FSM текущего пользователя.
+    """
+    await state.set_state(StatusFlow.waiting_for_run_id)
+    await message.answer(MSG_ASK_RUN_ID, parse_mode="HTML")
+
+
+@router.message(StatusFlow.waiting_for_run_id)
+async def process_status_run_id(message: Message, state: FSMContext, container: AppContainer) -> None:
+    """Принимает run_id от пользователя и возвращает статус запуска.
+
+    Вызывается автоматически когда пользователь находится в состоянии
+    ``StatusFlow.waiting_for_run_id`` и присылает любое сообщение.
+
+    Args:
+        message (Message): Сообщение с run_id от пользователя.
+        state (FSMContext): Контекст FSM — очищается после обработки.
         container (AppContainer): Контейнер приложения, инжектированный middleware.
     """
-    # TODO: распарсить run_id из message.text, запросить статус через container
+    await state.clear()
+
+    run_id = (message.text or "").strip()
+    logger = container.logger.getChild("bot")
+    logger.debug("process_status_run_id: run_id=%s user_id=%s", run_id, message.from_user and message.from_user.id)
+
+    if not run_id:
+        await message.answer("run_id не может быть пустым. Попробуй ещё раз: /status")
+        return
+
+    # TODO: получить статус запуска через container
     # Пример:
-    #   parts = (message.text or "").split(maxsplit=1)
-    #   if len(parts) < 2:
-    #       await message.answer("Использование: /status <run_id>")
-    #       return
-    #   run_id = parts[1].strip()
+    #   from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
     #   run_store = FilePipelineRunStore(container.settings)
     #   run = run_store.get(run_id)
     #   if run is None:
     #       await message.answer(MSG_STATUS_NOT_FOUND.format(run_id=run_id), parse_mode="HTML")
     #       return
-    #   await message.answer(MSG_STATUS_TEMPLATE.format(...), parse_mode="HTML")
+    #   await message.answer(
+    #       MSG_STATUS_TEMPLATE.format(
+    #           run_id=run_id,
+    #           status=run.status,
+    #           profile=run.profile,
+    #           started_at=run.started_at,
+    #           finished_at=run.finished_at or "—",
+    #       ),
+    #       parse_mode="HTML",
+    #   )
     _ = MSG_STATUS_TEMPLATE
     _ = MSG_STATUS_NOT_FOUND
-    container.logger.getChild("bot").debug("cmd_status: не реализован, user_id=%s", message.from_user and message.from_user.id)
     await message.answer(MSG_NOT_IMPLEMENTED)
 
 
