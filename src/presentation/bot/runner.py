@@ -89,7 +89,7 @@ async def watch_and_notify(
     status = payload.get("status")
 
     if status == "succeeded":
-        duration = (payload.get("result") or {}).get("duration_seconds", "?")
+        duration = (payload.get("result") or {}).get("result").get("duration_seconds", "?")
         logger.info("watch_and_notify: pipeline succeeded run_id=%s duration=%s", run_id, duration)
         await bot.send_message(
             chat_id,
