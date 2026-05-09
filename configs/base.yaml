@@ -78,3 +78,9 @@ api:
     storage_pvc_name: "dcp-storage"
     storage_mount_path: "/mnt/dcp"
     pipeline_profile: "dask_k8s"
+
+bot:
+  # Список Telegram user_id, которым разрешён доступ к боту.
+  # Пустой список означает, что бот доступен всем пользователям.
+  # Токен задаётся через переменную окружения TELEGRAM_BOT_TOKEN.
+  admin_chat_ids: []
