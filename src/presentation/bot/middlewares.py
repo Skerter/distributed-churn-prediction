@@ -7,21 +7,24 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from src.app.container import AppContainer
+from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
 from src.presentation.bot.messages import MSG_UNAUTHORIZED
 
 
 class ContainerMiddleware(BaseMiddleware):
-    """Инжектирует AppContainer в data каждого хендлера.
+    """Инжектирует AppContainer и FilePipelineRunStore в data каждого хендлера.
 
-    Добавляет ключ ``container`` в словарь data, что позволяет хендлерам
-    объявить параметр ``container: AppContainer`` и получить его автоматически.
+    Добавляет ключи ``container`` и ``run_store`` в словарь data,
+    что позволяет хендлерам объявить их как параметры и получать автоматически.
 
     Args:
         container (AppContainer): Инициализированный контейнер приложения.
+        run_store (FilePipelineRunStore): Хранилище состояния pipeline runs.
     """
 
-    def __init__(self, container: AppContainer) -> None:
+    def __init__(self, container: AppContainer, run_store: FilePipelineRunStore) -> None:
         self.container = container
+        self.run_store = run_store
         self.container.logger.getChild("bot.middleware").debug(
             "Инициализирован ContainerMiddleware: container_type=%s",
             type(container).__name__,
@@ -34,6 +37,7 @@ class ContainerMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         data["container"] = self.container
+        data["run_store"] = self.run_store
         return await handler(event, data)
 
 

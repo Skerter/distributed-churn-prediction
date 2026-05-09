@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
@@ -7,12 +9,21 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from src.app.container import AppContainer
+from src.application.dto.requests import CreatePipelineRunRequest
+from src.application.use_cases.get_health import get_health
+from src.application.use_cases.get_model_info import get_model_info
+from src.application.use_cases.list_profiles import list_profiles
+from src.infrastructure.execution.local_pipeline_executor import WebPipelineExecutor
+from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
 from src.presentation.bot.keyboards import profile_selection_keyboard
 from src.presentation.bot.messages import (
     MSG_ASK_RUN_ID,
+    MSG_HEALTH_OK,
     MSG_HELP,
     MSG_MODEL_INFO,
-    MSG_NOT_IMPLEMENTED,
+    MSG_PIPELINE_BUSY,
+    MSG_PIPELINE_ERROR,
+    MSG_PIPELINE_STARTED,
     MSG_PROFILES_LIST,
     MSG_SELECT_PROFILE,
     MSG_STATUS_CANCELLED,
@@ -21,11 +32,19 @@ from src.presentation.bot.messages import (
     MSG_WELCOME,
 )
 
+_STATUS_LABELS: dict[str, str] = {
+    "queued": "В очереди",
+    "running": "Выполняется",
+    "succeeded": "Успешно завершён",
+    "failed": "Завершён с ошибкой",
+}
+
 
 class StatusFlow(StatesGroup):
     """Состояния диалога команды /status."""
 
     waiting_for_run_id = State()
+
 
 router = Router()
 
@@ -52,36 +71,44 @@ async def cmd_help(message: Message) -> None:
 
 @router.message(Command("health"))
 async def cmd_health(message: Message, container: AppContainer) -> None:
-    """Обрабатывает команду /health. Проверяет состояние приложения.
+    """Обрабатывает команду /health. Возвращает состояние приложения.
 
     Args:
         message (Message): Входящее сообщение Telegram.
         container (AppContainer): Контейнер приложения, инжектированный middleware.
     """
-    # TODO: вызвать health use case через container и вернуть результат
-    # Пример:
-    #   from src.application.use_cases.health import HealthUseCase
-    #   result = HealthUseCase(container).execute()
-    #   await message.answer(MSG_HEALTH_OK if result.ok else MSG_HEALTH_ERROR.format(error=result.error))
-    container.logger.getChild("bot").debug("cmd_health: не реализован, user_id=%s", message.from_user and message.from_user.id)
-    await message.answer(MSG_NOT_IMPLEMENTED)
+    result = get_health(container)
+    await message.answer(
+        MSG_HEALTH_OK.format(
+            app_name=result.app_name,
+            app_version=result.app_version,
+            profile_mode=result.profile_mode,
+            backend=result.backend,
+        ),
+        parse_mode="HTML",
+    )
 
 
 @router.message(Command("profiles"))
-async def cmd_profiles(message: Message, container: AppContainer) -> None:
+async def cmd_profiles(message: Message) -> None:
     """Обрабатывает команду /profiles. Возвращает список доступных профилей.
 
     Args:
         message (Message): Входящее сообщение Telegram.
-        container (AppContainer): Контейнер приложения, инжектированный middleware.
     """
-    # TODO: получить список профилей из container.pipeline_registry и отформатировать
-    # Пример:
-    #   profiles = "\n".join(f"• {p}" for p in container.pipeline_registry.keys())
-    #   await message.answer(MSG_PROFILES_LIST.format(profiles=profiles))
-    _ = MSG_PROFILES_LIST
-    container.logger.getChild("bot").debug("cmd_profiles: не реализован, user_id=%s", message.from_user and message.from_user.id)
-    await message.answer(MSG_NOT_IMPLEMENTED)
+    result = list_profiles()
+    lines = []
+    for p in result.profiles:
+        header = f"<b>{p.name}</b>"
+        if p.name == result.default_profile:
+            header += " (по умолчанию)"
+        lines.append(f"{header}\n{p.description}")
+        if p.warning:
+            lines.append(f"<i>Внимание: {p.warning}</i>")
+    await message.answer(
+        MSG_PROFILES_LIST.format(profiles="\n\n".join(lines)),
+        parse_mode="HTML",
+    )
 
 
 @router.message(Command("run"))
@@ -95,57 +122,65 @@ async def cmd_run(message: Message) -> None:
 
 
 @router.callback_query(F.data.startswith("run:"))
-async def cb_run_pipeline(callback: CallbackQuery, container: AppContainer) -> None:
-    """Обрабатывает выбор профиля из inline-клавиатуры и запускает пайплайн.
+async def cb_run_pipeline(
+    callback: CallbackQuery,
+    container: AppContainer,
+    run_store: FilePipelineRunStore,
+) -> None:
+    """Запускает пайплайн в фоне для выбранного профиля.
 
     Получает профиль из ``callback.data`` (формат ``run:<profile>``),
-    передаёт управление в пайплайн через AppContainer.
+    создаёт pipeline run запись и запускает выполнение в отдельном потоке.
+    Пользователь немедленно получает run_id для отслеживания прогресса
+    через /status.
 
     Args:
         callback (CallbackQuery): Callback с выбранным профилем.
         container (AppContainer): Контейнер приложения, инжектированный middleware.
+        run_store (FilePipelineRunStore): Хранилище pipeline runs, инжектированное middleware.
 
     Note:
         Для профиля ``dask_k8s`` требуется, чтобы бот был запущен внутри
         Kubernetes-кластера или Dask scheduler был доступен по сети
-        (``tcp://dcp-cluster-service:8786``).
-        При недоступности scheduler DaskK8sPipeline выбросит ``RuntimeError``
-        — его нужно перехватить и отправить пользователю понятное сообщение.
-
-        Для запуска dask_k8s-пайплайна необходимо пересоздать AppContainer
-        с ``init_dask_client=True`` и профилем ``dask_k8s``, поскольку
-        бот стартует с ``init_dask_client=False``.
+        (``tcp://dcp-cluster-service:8786``). При недоступности scheduler
+        pipeline run создастся со статусом FAILED — результат виден через /status.
     """
-    profile: str = callback.data.split(":", 1)[1]  # "run:pandas" → "pandas"
+    profile: str = callback.data.split(":", 1)[1]
     logger = container.logger.getChild("bot")
-    logger.debug("cb_run_pipeline: profile=%s user_id=%s", profile, callback.from_user and callback.from_user.id)
+    logger.debug(
+        "cb_run_pipeline: profile=%s user_id=%s",
+        profile,
+        callback.from_user and callback.from_user.id,
+    )
 
-    # TODO: запустить пайплайн через container
-    # Общий шаблон (для pandas и dask_local):
-    #
-    #   pipeline = container.build_pipeline(run_options={"execute": True})
-    #   result = await asyncio.to_thread(pipeline.run)
-    #   run_id = result.get("run_id", "n/a")
-    #   await callback.message.answer(MSG_PIPELINE_STARTED.format(run_id=run_id), parse_mode="HTML")
-    #
-    # Для dask_k8s — пересоздать контейнер с Dask client:
-    #
-    #   from src.app.bootstrap import bootstrap
-    #   try:
-    #       k8s_container = bootstrap(profile="dask_k8s", init_dask_client=True)
-    #       pipeline = k8s_container.build_pipeline(run_options={"execute": True})
-    #       result = await asyncio.to_thread(pipeline.run)
-    #       run_id = result.get("run_id", "n/a")
-    #       await callback.message.answer(MSG_PIPELINE_STARTED.format(run_id=run_id), parse_mode="HTML")
-    #   except RuntimeError as exc:
-    #       logger.error("Не удалось запустить dask_k8s pipeline: %s", exc)
-    #       await callback.message.answer(
-    #           "Dask scheduler недоступен. Убедитесь, что бот запущен "
-    #           "внутри K8s-кластера или выполнен port-forward на порт 8786."
-    #       )
-
-    await callback.message.answer(MSG_NOT_IMPLEMENTED)
     await callback.answer()
+
+    executor = WebPipelineExecutor(
+        profile=profile,
+        store=run_store,
+        logger=logger,
+        max_concurrent_runs=1,
+    )
+
+    try:
+        payload = await asyncio.to_thread(
+            executor.submit,
+            CreatePipelineRunRequest(execute=True),
+        )
+    except RuntimeError as exc:
+        if "активный pipeline run" in str(exc):
+            await callback.message.answer(MSG_PIPELINE_BUSY)
+        else:
+            logger.error(
+                "Не удалось запустить pipeline: profile=%s error=%s", profile, exc
+            )
+            await callback.message.answer(MSG_PIPELINE_ERROR.format(error=exc))
+        return
+
+    await callback.message.answer(
+        MSG_PIPELINE_STARTED.format(run_id=payload["run_id"]),
+        parse_mode="HTML",
+    )
 
 
 @router.message(Command("cancel"))
@@ -176,8 +211,13 @@ async def cmd_status(message: Message, state: FSMContext) -> None:
 
 
 @router.message(StatusFlow.waiting_for_run_id)
-async def process_status_run_id(message: Message, state: FSMContext, container: AppContainer) -> None:
-    """Принимает run_id от пользователя и возвращает статус запуска.
+async def process_status_run_id(
+    message: Message,
+    state: FSMContext,
+    container: AppContainer,
+    run_store: FilePipelineRunStore,
+) -> None:
+    """Принимает run_id и возвращает статус запуска.
 
     Вызывается автоматически когда пользователь находится в состоянии
     ``StatusFlow.waiting_for_run_id`` и присылает любое сообщение.
@@ -186,38 +226,41 @@ async def process_status_run_id(message: Message, state: FSMContext, container: 
         message (Message): Сообщение с run_id от пользователя.
         state (FSMContext): Контекст FSM — очищается после обработки.
         container (AppContainer): Контейнер приложения, инжектированный middleware.
+        run_store (FilePipelineRunStore): Хранилище pipeline runs, инжектированное middleware.
     """
     await state.clear()
 
     run_id = (message.text or "").strip()
     logger = container.logger.getChild("bot")
-    logger.debug("process_status_run_id: run_id=%s user_id=%s", run_id, message.from_user and message.from_user.id)
+    logger.debug(
+        "process_status_run_id: run_id=%s user_id=%s",
+        run_id,
+        message.from_user and message.from_user.id,
+    )
 
     if not run_id:
         await message.answer("run_id не может быть пустым. Попробуй ещё раз: /status")
         return
 
-    # TODO: получить статус запуска через container
-    # Пример:
-    #   from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
-    #   run_store = FilePipelineRunStore(container.settings)
-    #   run = run_store.get(run_id)
-    #   if run is None:
-    #       await message.answer(MSG_STATUS_NOT_FOUND.format(run_id=run_id), parse_mode="HTML")
-    #       return
-    #   await message.answer(
-    #       MSG_STATUS_TEMPLATE.format(
-    #           run_id=run_id,
-    #           status=run.status,
-    #           profile=run.profile,
-    #           started_at=run.started_at,
-    #           finished_at=run.finished_at or "—",
-    #       ),
-    #       parse_mode="HTML",
-    #   )
-    _ = MSG_STATUS_TEMPLATE
-    _ = MSG_STATUS_NOT_FOUND
-    await message.answer(MSG_NOT_IMPLEMENTED)
+    try:
+        payload = await asyncio.to_thread(run_store.get, run_id)
+    except FileNotFoundError:
+        await message.answer(MSG_STATUS_NOT_FOUND.format(run_id=run_id), parse_mode="HTML")
+        return
+
+    status_raw = payload.get("status", "—")
+    text = MSG_STATUS_TEMPLATE.format(
+        run_id=run_id,
+        status=_STATUS_LABELS.get(status_raw, status_raw),
+        profile=payload.get("profile", "—"),
+        started_at=payload.get("started_at") or "—",
+        finished_at=payload.get("finished_at") or "—",
+    )
+
+    if payload.get("error"):
+        text += f"\n\nОшибка: <code>{payload['error']}</code>"
+
+    await message.answer(text, parse_mode="HTML")
 
 
 @router.message(Command("model"))
@@ -228,13 +271,29 @@ async def cmd_model(message: Message, container: AppContainer) -> None:
         message (Message): Входящее сообщение Telegram.
         container (AppContainer): Контейнер приложения, инжектированный middleware.
     """
-    # TODO: получить метаданные модели через container и отформатировать ответ
-    # Пример:
-    #   settings = container.settings
-    #   await message.answer(
-    #       MSG_MODEL_INFO.format(name=settings.model.name, version=settings.model.version),
-    #       parse_mode="HTML",
-    #   )
-    _ = MSG_MODEL_INFO
-    container.logger.getChild("bot").debug("cmd_model: не реализован, user_id=%s", message.from_user and message.from_user.id)
-    await message.answer(MSG_NOT_IMPLEMENTED)
+    profile = container.settings.runtime.mode.value
+    result = get_model_info(container, profile=profile)
+
+    model_exists = "файл найден" if result.model.get("exists") else "файл не найден"
+
+    if result.metrics:
+        metrics_lines = [
+            f"  {k}: {v:.4f}" if isinstance(v, float) else f"  {k}: {v}"
+            for k, v in result.metrics.items()
+        ]
+        metrics_text = "\n".join(metrics_lines)
+    else:
+        metrics_text = "  нет данных"
+
+    await message.answer(
+        MSG_MODEL_INFO.format(
+            name=result.model["name"],
+            version=result.model["version"],
+            mode=result.mode,
+            backend=result.backend,
+            filename=result.model["expected_filename"],
+            exists=model_exists,
+            metrics=metrics_text,
+        ),
+        parse_mode="HTML",
+    )

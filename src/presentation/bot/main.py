@@ -10,6 +10,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.app.bootstrap import bootstrap
 from src.infrastructure.execution.dask_client import close_dask_client
+from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
 from src.presentation.bot.handlers import router
 from src.presentation.bot.middlewares import AuthMiddleware, ContainerMiddleware
 
@@ -65,10 +66,14 @@ async def _run_bot(token: str, profile: str) -> None:
     else:
         logger.info("Доступ открыт для всех пользователей")
 
+    run_store = FilePipelineRunStore(
+        root_dir=container.settings.logs_dir / "pipeline_runs",
+    )
+
     bot = Bot(token=token)
     dp = Dispatcher(storage=MemoryStorage())
 
-    container_mw = ContainerMiddleware(container)
+    container_mw = ContainerMiddleware(container, run_store)
     auth_mw = AuthMiddleware(admin_ids, logger.getChild("auth"))
 
     dp.message.middleware(container_mw)
