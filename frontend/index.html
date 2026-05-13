@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Churn Prediction — Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Шапка дашборда с заголовком проекта и описанием -->
+    <header class="header">
+        <div class="container">
+            <div class="header-inner">
+                <div class="logo">
+                    <div class="logo-icon">DC</div>
+                    <div>
+                        <h1>Distributed Churn Prediction</h1>
+                        <p class="subtitle">ML Pipeline Control Dashboard</p>
+                    </div>
+                </div>
+                <!-- Индикатор подключения к API в правом верхнем углу -->
+                <div class="api-info">
+                    <span class="api-label">API</span>
+                    <span class="api-url" id="apiUrl">http://127.0.0.1:8000</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container main-grid">
+
+        <!-- ====================================================== -->
+        <!--               БЛОК 1: HEALTH CHECK                       -->
+        <!-- ====================================================== -->
+        <section class="card">
+            <div class="card-header">
+                <div>
+                    <h2>Health Check</h2>
+                    <p class="card-description">Проверка доступности сервера API</p>
+                </div>
+                <!-- Цветная точка отражает текущее состояние сервера -->
+                <span class="status-dot" id="healthDot" data-status="unknown"></span>
+            </div>
+
+            <div class="card-body">
+                <button id="healthBtn" class="btn btn-primary">
+                    <span class="btn-text">Проверить статус</span>
+                </button>
+
+                <!-- Сюда выводится JSON-ответ от GET /health -->
+                <pre class="output" id="healthOutput">Нажмите кнопку, чтобы проверить статус сервера...</pre>
+            </div>
+        </section>
+
+        <!-- ====================================================== -->
+        <!--           БЛОК 2: ЗАПУСК ML ПАЙПЛАЙНА                    -->
+        <!-- ====================================================== -->
+        <section class="card">
+            <div class="card-header">
+                <div>
+                    <h2>Запуск ML Pipeline</h2>
+                    <p class="card-description">Параметры выполнения пайплайна</p>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <!-- Чекбоксы для управления параметрами POST /pipeline/runs -->
+                <div class="checkbox-group">
+                    <label class="checkbox">
+                        <input type="checkbox" id="execute" checked>
+                        <span class="checkbox-label">execute</span>
+                        <span class="checkbox-hint">Запустить выполнение</span>
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" id="skip_load">
+                        <span class="checkbox-label">skip_load</span>
+                        <span class="checkbox-hint">Пропустить загрузку данных</span>
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" id="skip_features">
+                        <span class="checkbox-label">skip_features</span>
+                        <span class="checkbox-hint">Пропустить feature engineering</span>
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" id="skip_train">
+                        <span class="checkbox-label">skip_train</span>
+                        <span class="checkbox-hint">Пропустить обучение модели</span>
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" id="skip_eval">
+                        <span class="checkbox-label">skip_eval</span>
+                        <span class="checkbox-hint">Пропустить оценку модели</span>
+                    </label>
+                </div>
+
+                <button id="runBtn" class="btn btn-success">
+                    <span class="btn-text">Запустить Pipeline</span>
+                </button>
+
+                <!-- Здесь покажется присвоенный run_id после успешного POST-запроса -->
+                <div class="run-id-display" id="runIdDisplay" hidden>
+                    <span class="run-id-label">Run ID:</span>
+                    <code class="run-id-value" id="runIdValue"></code>
+                </div>
+
+                <!-- Полный JSON-ответ при создании запуска -->
+                <pre class="output" id="runOutput">Pipeline ещё не запускался...</pre>
+            </div>
+        </section>
+
+        <!-- ====================================================== -->
+        <!--           БЛОК 3: СТАТУС ЗАПУСКА                         -->
+        <!-- ====================================================== -->
+        <section class="card card-wide">
+            <div class="card-header">
+                <div>
+                    <h2>Статус пайплайна</h2>
+                    <p class="card-description">Мониторинг текущего запуска</p>
+                </div>
+                <!-- Цветной бейдж со статусом: queued / running / succeeded / failed -->
+                <span class="status-badge" id="statusBadge" data-status="idle">—</span>
+            </div>
+
+            <div class="card-body">
+                <div class="status-controls">
+                    <button id="statusBtn" class="btn btn-secondary" disabled>
+                        <span class="btn-text">Проверить статус запуска</span>
+                    </button>
+
+                    <!-- Переключатель автополлинга каждые 3 секунды -->
+                    <label class="toggle">
+                        <input type="checkbox" id="autoPoll" checked>
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label">Автообновление (3с)</span>
+                    </label>
+                </div>
+
+                <!-- Информационная строка о том, что сейчас отслеживается -->
+                <div class="status-info" id="statusInfo">
+                    Нет активного запуска. Запустите Pipeline, чтобы начать отслеживание.
+                </div>
+
+                <!-- Полный JSON-ответ от GET /pipeline/runs/{run_id} -->
+                <pre class="output" id="statusOutput">—</pre>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>Distributed Churn Prediction · University ML Project</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
