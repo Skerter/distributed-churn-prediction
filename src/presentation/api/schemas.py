@@ -9,7 +9,6 @@ class HealthApiResponse(BaseModel):
     app_name: str
     app_version: str
     profile_mode: str
-    backend: str
     project_root: str
 
 
@@ -30,7 +29,6 @@ class RunPipelineApiResponse(BaseModel):
     success: bool
     profile: str
     mode: str
-    backend: str
     pipeline_path: str
     executed: bool
     message: str
@@ -40,7 +38,6 @@ class RunPipelineApiResponse(BaseModel):
 class ProfileApiItem(BaseModel):
     name: str
     runtime_mode: str
-    backend: str
     web_enabled: bool
     description: str
     warning: str | None = None
@@ -54,7 +51,6 @@ class ProfilesApiResponse(BaseModel):
 class ConfigSummaryApiResponse(BaseModel):
     app: dict[str, Any]
     runtime: dict[str, Any]
-    backend: str
     model: dict[str, Any]
     data: dict[str, Any]
     dask: dict[str, Any]
@@ -66,7 +62,6 @@ class ConfigSummaryApiResponse(BaseModel):
 class ModelInfoApiResponse(BaseModel):
     profile: str
     mode: str
-    backend: str
     model: dict[str, Any]
     artifacts: dict[str, Any]
     metrics: dict[str, Any] | None = None

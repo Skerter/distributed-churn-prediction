@@ -24,7 +24,6 @@ def execute_pipeline(
             success=True,
             profile=request.profile,
             mode=container.settings.runtime.mode.value,
-            backend=container.backend.value,
             pipeline_path=pipeline_path,
             executed=False,
             message=(
@@ -41,7 +40,6 @@ def execute_pipeline(
         success=True,
         profile=request.profile,
         mode=container.settings.runtime.mode.value,
-        backend=container.backend.value,
         pipeline_path=pipeline_path,
         executed=True,
         message="Pipeline выполнен успешно",

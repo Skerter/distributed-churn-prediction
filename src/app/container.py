@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.app.settings import Settings
-from src.shared.enums import BackendKind
 from src.shared.exceptions import PipelineResolutionError
 
 
@@ -23,7 +22,6 @@ class AppContainer:
     """
     settings: Settings
     logger: logging.Logger
-    backend: BackendKind #TODO: бесполезно, нужно удалить и юзать только runtime.mode
     dask_client: Any | None
     pipeline_registry: dict[str, str]
 

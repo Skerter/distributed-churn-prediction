@@ -73,7 +73,6 @@ def get_model_info(container: AppContainer, profile: str) -> ModelInfoResponse:
     return ModelInfoResponse(
         profile=profile,
         mode=mode.value,
-        backend=container.backend.value,
         model={
             "name": settings.model.name,
             "version": settings.model.version,

@@ -46,8 +46,7 @@ MSG_HELP = (
 MSG_HEALTH_OK = (
     "<b>Приложение работает нормально</b>\n\n"
     "Приложение: {app_name} {app_version}\n"
-    "Профиль: {profile_mode}\n"
-    "Бэкенд: {backend}"
+    "Профиль: {profile_mode}"
 )
 
 MSG_HEALTH_ERROR = "Ошибка при проверке состояния: {error}"
@@ -132,7 +131,6 @@ MSG_STATUS_CANCELLED = "Отменено."
 MSG_MODEL_INFO = (
     "<b>Модель:</b> {name} v{version}\n"
     "Режим: {mode}\n"
-    "Бэкенд: {backend}\n"
     "Файл: <code>{filename}</code> — {exists}\n\n"
     "<b>Метрики:</b>\n{metrics}"
 )

@@ -15,6 +15,5 @@ def get_health(container: AppContainer) -> HealthResponse:
         app_name=container.settings.app.name,
         app_version=container.settings.app.version,
         profile_mode=container.settings.runtime.mode.value,
-        backend=container.backend.value,
         project_root=str(container.settings.project_root),
     )

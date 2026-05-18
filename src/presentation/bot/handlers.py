@@ -86,7 +86,6 @@ async def cmd_health(message: Message, container: AppContainer) -> None:
             app_name=result.app_name,
             app_version=result.app_version,
             profile_mode=result.profile_mode,
-            backend=result.backend,
         ),
         parse_mode="HTML",
     )
@@ -330,7 +329,6 @@ async def cmd_model(message: Message, container: AppContainer) -> None:
             name=result.model["name"],
             version=result.model["version"],
             mode=result.mode,
-            backend=result.backend,
             filename=result.model["expected_filename"],
             exists=model_exists,
             metrics=metrics_text,

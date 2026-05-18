@@ -15,7 +15,6 @@ def get_config_summary(container: AppContainer) -> ConfigSummaryResponse:
         runtime={
             "mode": settings.runtime.mode.value,
         },
-        backend=container.backend.value,
         model={
             "name": settings.model.name,
             "version": settings.model.version,

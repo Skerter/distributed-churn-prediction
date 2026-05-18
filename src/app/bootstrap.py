@@ -3,7 +3,6 @@ from __future__ import annotations
 from src.app.container import AppContainer
 from src.app.settings import Settings
 from src.infrastructure.config.loader import find_project_root, load_settings_dict
-from src.infrastructure.execution.backend import resolve_backend  # TODO: Нахуй не нужен, можно юзать только runtime.mode
 from src.infrastructure.execution.dask_client import create_dask_client
 from src.infrastructure.logging.factory import build_logger
 from src.infrastructure.storage.paths import ensure_project_dirs
@@ -25,8 +24,6 @@ def bootstrap(profile: str = "pandas", init_dask_client: bool = True) -> AppCont
 
     ensure_project_dirs(settings)
     logger = build_logger(settings)
-    backend = resolve_backend(settings.runtime.mode) # TODO Тут тож убрать потом
-
     if init_dask_client:
         dask_client = create_dask_client(settings, logger)
     else:
@@ -44,16 +41,14 @@ def bootstrap(profile: str = "pandas", init_dask_client: bool = True) -> AppCont
     }
 
     logger.info(
-        "Bootstrap завершён: profile=%s mode=%s backend=%s",
+        "Bootstrap завершён: profile=%s mode=%s",
         profile,
         settings.runtime.mode.value,
-        backend.value,
     )
 
     return AppContainer(
         settings=settings,
         logger=logger,
-        backend=backend,
         dask_client=dask_client,
         pipeline_registry=pipeline_registry,
     )

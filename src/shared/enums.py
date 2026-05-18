@@ -7,11 +7,6 @@ class RuntimeMode(str, Enum):
     DASK_K8S = "dask_k8s"
 
 
-class BackendKind(str, Enum):
-    LOCAL = "local"
-    DASK = "dask"
-
-
 class PipelineExecutorKind(str, Enum):
     CLI = "cli"
     WEB = "web"

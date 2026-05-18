@@ -12,7 +12,6 @@ class HealthResponse:
     app_name: str
     app_version: str
     profile_mode: str
-    backend: str
     project_root: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -20,7 +19,6 @@ class HealthResponse:
             "app_name": self.app_name,
             "app_version": self.app_version,
             "profile_mode": self.profile_mode,
-            "backend": self.backend,
             "project_root": self.project_root,
         }
 
@@ -35,7 +33,6 @@ class RunPipelineResponse:
     success: bool
     profile: str
     mode: str
-    backend: str
     pipeline_path: str
     executed: bool
     message: str
@@ -46,7 +43,6 @@ class RunPipelineResponse:
             "success": self.success,
             "profile": self.profile,
             "mode": self.mode,
-            "backend": self.backend,
             "pipeline_path": self.pipeline_path,
             "executed": self.executed,
             "message": self.message,
@@ -58,7 +54,6 @@ class RunPipelineResponse:
 class ProfileInfo:
     name: str
     runtime_mode: str
-    backend: str
     web_enabled: bool
     description: str
     warning: str | None = None
@@ -67,7 +62,6 @@ class ProfileInfo:
         return {
             "name": self.name,
             "runtime_mode": self.runtime_mode,
-            "backend": self.backend,
             "web_enabled": self.web_enabled,
             "description": self.description,
             "warning": self.warning,
@@ -90,7 +84,6 @@ class ProfilesResponse:
 class ConfigSummaryResponse:
     app: dict[str, Any]
     runtime: dict[str, Any]
-    backend: str
     model: dict[str, Any]
     data: dict[str, Any]
     dask: dict[str, Any]
@@ -102,7 +95,6 @@ class ConfigSummaryResponse:
         return {
             "app": self.app,
             "runtime": self.runtime,
-            "backend": self.backend,
             "model": self.model,
             "data": self.data,
             "dask": self.dask,
@@ -115,7 +107,6 @@ class ConfigSummaryResponse:
 class ModelInfoResponse:
     profile: str
     mode: str
-    backend: str
     model: dict[str, Any]
     artifacts: dict[str, Any]
     metrics: dict[str, Any] | None = None
@@ -124,7 +115,6 @@ class ModelInfoResponse:
         return {
             "profile": self.profile,
             "mode": self.mode,
-            "backend": self.backend,
             "model": self.model,
             "artifacts": self.artifacts,
             "metrics": self.metrics,

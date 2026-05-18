@@ -107,7 +107,7 @@ class DaskLocalPipeline(BasePipeline):
             skipped_steps.append("train")
         else:
             self.logger.info("Шаг 3/4: dask local train")
-            artifacts["train"] = train_dask_local_model(
+            artifacts["train"] = train_dask_model(
                 settings=self.config,
                 logger=self.logger.getChild("train"),
                 client=self.client,
@@ -119,7 +119,7 @@ class DaskLocalPipeline(BasePipeline):
             skipped_steps.append("eval")
         else:
             self.logger.info("Шаг 4/4: Dask evaluate model")
-            artifacts["eval"] = evaluate_dask_local_model(
+            artifacts["eval"] = evaluate_dask_model(
                 settings=self.config,
                 logger=self.logger.getChild("eval"),
                 client=self.client,

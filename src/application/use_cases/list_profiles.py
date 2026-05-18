@@ -1,5 +1,5 @@
 from src.application.dto.responses import ProfileInfo, ProfilesResponse
-from src.shared.enums import BackendKind, RuntimeMode
+from src.shared.enums import RuntimeMode
 
 
 def list_profiles() -> ProfilesResponse:
@@ -9,7 +9,6 @@ def list_profiles() -> ProfilesResponse:
         ProfileInfo(
             name="pandas",
             runtime_mode=RuntimeMode.PANDAS.value,
-            backend=BackendKind.LOCAL.value,
             web_enabled=True,
             description=(
                 "Локальный pandas-режим. Подходит для быстрой проверки API, "
@@ -19,17 +18,15 @@ def list_profiles() -> ProfilesResponse:
         ProfileInfo(
             name="dask_local",
             runtime_mode=RuntimeMode.DASK_LOCAL.value,
-            backend=BackendKind.DASK.value,
             web_enabled=True,
             description=(
                 "Локальный Dask-режим. Поднимает LocalCluster на машине, "
-                "где запущен backend."
+                "где запущен сервер."
             ),
         ),
         ProfileInfo(
             name="dask_k8s",
             runtime_mode=RuntimeMode.DASK_K8S.value,
-            backend=BackendKind.DASK.value,
             web_enabled=False,
             description=(
                 "Kubernetes-режим для запуска через внешний Dask scheduler "
