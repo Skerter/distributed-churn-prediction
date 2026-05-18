@@ -13,7 +13,7 @@ from src.application.dto.requests import CreatePipelineRunRequest
 from src.application.use_cases.get_health import get_health
 from src.application.use_cases.get_model_info import get_model_info
 from src.application.use_cases.list_profiles import list_profiles
-from src.infrastructure.execution.pipeline_executor_factory import build_bot_pipeline_executor
+from src.infrastructure.execution.local_pipeline_executor import BotPipelineExecutor
 from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
 from src.presentation.bot.keyboards import profile_selection_keyboard
 from src.presentation.bot.messages import (
@@ -29,6 +29,8 @@ from src.presentation.bot.messages import (
     MSG_STATUS_CANCELLED,
     MSG_STATUS_NOT_FOUND,
     MSG_STATUS_TEMPLATE,
+    MSG_STOP_NO_ACTIVE,
+    MSG_STOP_OK,
     MSG_WELCOME,
 )
 from src.presentation.bot.runner import watch_and_notify
@@ -127,6 +129,7 @@ async def cb_run_pipeline(
     callback: CallbackQuery,
     container: AppContainer,
     run_store: FilePipelineRunStore,
+    executor: BotPipelineExecutor,
 ) -> None:
     """Запускает пайплайн в фоне для выбранного профиля.
 
@@ -156,7 +159,6 @@ async def cb_run_pipeline(
 
     await callback.answer()
 
-    executor = build_bot_pipeline_executor(container=container, store=run_store)
     chat_id = callback.from_user.id
     timeout = container.settings.bot.pipeline_timeout_seconds
 
@@ -191,6 +193,34 @@ async def cb_run_pipeline(
         MSG_PIPELINE_STARTED.format(run_id=run_id),
         parse_mode="HTML",
     )
+
+
+@router.message(Command("stop"))
+async def cmd_stop(
+    message: Message,
+    run_store: FilePipelineRunStore,
+    executor: BotPipelineExecutor,
+) -> None:
+    """Останавливает текущий активный pipeline run.
+
+    Args:
+        message (Message): Входящее сообщение Telegram.
+        run_store (FilePipelineRunStore): Хранилище pipeline runs, инжектированное middleware.
+        executor (BotPipelineExecutor): Executor с доступом к cancel_event каждого run.
+    """
+    active_runs = run_store.list_active_runs()
+    if not active_runs:
+        await message.answer(MSG_STOP_NO_ACTIVE)
+        return
+
+    run_id = active_runs[0]
+    cancel_event = executor.get_cancel_event(run_id)
+
+    if cancel_event is not None:
+        cancel_event.set()
+
+    run_store.mark_failed(run_id, error="Отменено пользователем")
+    await message.answer(MSG_STOP_OK.format(run_id=run_id), parse_mode="HTML")
 
 
 @router.message(Command("cancel"))

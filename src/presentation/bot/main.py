@@ -10,6 +10,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.app.bootstrap import bootstrap
 from src.infrastructure.execution.dask_client import close_dask_client
+from src.infrastructure.execution.pipeline_executor_factory import build_bot_pipeline_executor
 from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
 from src.presentation.bot.handlers import router
 from src.presentation.bot.middlewares import AuthMiddleware, ContainerMiddleware
@@ -82,10 +83,12 @@ async def _run_bot(token: str, profile: str) -> None:
 
     _recover_stale_runs(run_store, logger)
 
+    executor = build_bot_pipeline_executor(container=container, store=run_store)
+
     bot = Bot(token=token)
     dp = Dispatcher(storage=MemoryStorage())
 
-    container_mw = ContainerMiddleware(container, run_store)
+    container_mw = ContainerMiddleware(container, run_store, executor)
     auth_mw = AuthMiddleware(admin_ids, logger.getChild("auth"))
 
     dp.message.middleware(container_mw)

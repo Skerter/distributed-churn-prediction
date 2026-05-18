@@ -77,6 +77,10 @@ async def watch_and_notify(
     on_done(run_id)
     logger.debug("watch_and_notify: тред завершён run_id=%s", run_id)
 
+    if cancel_event.is_set():
+        logger.info("watch_and_notify: run %s отменён пользователем — уведомление пропущено", run_id)
+        return
+
     try:
         payload = run_store.get(run_id)
     except FileNotFoundError:
@@ -89,7 +93,9 @@ async def watch_and_notify(
     status = payload.get("status")
 
     if status == "succeeded":
-        duration = (payload.get("result") or {}).get("result").get("duration_seconds", "?")
+        result_outer = payload.get("result") or {}
+        result_inner = result_outer.get("result") or {}
+        duration = result_inner.get("duration_seconds", "?")
         logger.info("watch_and_notify: pipeline succeeded run_id=%s duration=%s", run_id, duration)
         await bot.send_message(
             chat_id,
