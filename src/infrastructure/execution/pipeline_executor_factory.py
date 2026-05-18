@@ -5,6 +5,7 @@ from src.infrastructure.execution.kubernetes_pipeline_executor import (
     KubernetesJobPipelineExecutor,
 )
 from src.infrastructure.execution.local_pipeline_executor import (
+    BotPipelineExecutor,
     CliPipelineExecutor,
     WebPipelineExecutor,
 )
@@ -44,4 +45,22 @@ def build_pipeline_executor(
 
     raise RuntimeError(
         f"Неизвестный pipeline executor: {settings.api.pipeline_executor.value}"
+    )
+
+
+def build_bot_pipeline_executor(
+    *,
+    container: AppContainer,
+    store: FilePipelineRunStore,
+) -> BotPipelineExecutor:
+    """Создаёт executor для Telegram-бота.
+
+    В отличие от build_pipeline_executor, всегда возвращает BotPipelineExecutor
+    и передаёт готовый AppContainer без повторного bootstrap.
+    """
+    return BotPipelineExecutor(
+        container=container,
+        store=store,
+        logger=container.logger,
+        max_concurrent_runs=container.settings.api.max_concurrent_pipeline_runs,
     )

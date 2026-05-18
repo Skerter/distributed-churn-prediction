@@ -112,6 +112,23 @@ class ApiSettings:
 
 
 @dataclass(slots=True)
+class BotSettings:
+    """Настройки Telegram-бота.
+
+    Args:
+        admin_chat_ids (list[int]): Список Telegram user_id с доступом к боту.
+            Пустой список означает, что бот доступен всем пользователям.
+        pipeline_timeout_seconds (int): Максимальное время ожидания pipeline run в секундах.
+            По истечении бот помечает run как FAILED и уведомляет пользователя.
+
+    Raises:
+        ConfigError: Если не удалось разрешить конфигурационные параметры.
+    """
+    admin_chat_ids: list[int]
+    pipeline_timeout_seconds: int = 7200
+
+
+@dataclass(slots=True)
 class Settings:
     """Основной класс настроек приложения, который агрегирует все конфигурационные параметры, необходимые для работы приложения, включая пути, параметры данных, настройки логирования, режим выполнения, параметры Dask, настройки модели и другие.
 
@@ -135,6 +152,7 @@ class Settings:
     training: TrainingSettings
     evaluation: EvaluationSettings
     api: ApiSettings
+    bot: BotSettings
 
     @property
     def data_source_dir(self) -> Path:
@@ -235,6 +253,10 @@ class Settings:
                     "pipeline_profile": self.api.kubernetes.pipeline_profile,
                 },
             },
+            "bot": {
+                "admin_chat_ids": self.bot.admin_chat_ids,
+                "pipeline_timeout_seconds": self.bot.pipeline_timeout_seconds,
+            },
         }
 
     @classmethod
@@ -253,6 +275,7 @@ class Settings:
             evaluation_data = data.get("evaluation", {})
             api_data = data.get("api", {})
             kubernetes_data = api_data.get("kubernetes", {})
+            bot_data = data.get("bot", {})
         except KeyError as exc:
             raise ConfigError(f"В конфиге отсутствует обязательный ключ: {exc}") from exc
 
@@ -342,5 +365,9 @@ class Settings:
                     storage_mount_path=kubernetes_data.get("storage_mount_path", "/mnt/dcp"),
                     pipeline_profile=kubernetes_data.get("pipeline_profile", "dask_k8s"),
                 ),
+            ),
+            bot=BotSettings(
+                admin_chat_ids=list(bot_data.get("admin_chat_ids", [])),
+                pipeline_timeout_seconds=int(bot_data.get("pipeline_timeout_seconds", 7200)),
             ),
         )

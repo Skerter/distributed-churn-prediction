@@ -78,3 +78,12 @@ api:
     storage_pvc_name: "dcp-storage"
     storage_mount_path: "/mnt/dcp"
     pipeline_profile: "dask_k8s"
+
+bot:
+  # Список Telegram user_id, которым разрешён доступ к боту.
+  # Пустой список означает, что бот доступен всем пользователям.
+  # Токен задаётся через переменную окружения TELEGRAM_BOT_TOKEN.
+  admin_chat_ids: []
+  # Максимальное время выполнения pipeline run в секундах (2 часа по умолчанию).
+  # По истечении run помечается FAILED и пользователь получает уведомление.
+  pipeline_timeout_seconds: 7200
