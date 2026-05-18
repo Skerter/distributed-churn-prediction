@@ -1,0 +1,35 @@
+# distributed-churn-prediction — runtime зависимости (pip).
+#
+# Это альтернатива conda-окружениям (environment.yml / environment_linux.yml)
+# для случаев, когда conda недоступна. Pin'ы синхронизированы с environment_linux.yml.
+# Для разработки и Jupyter-окружения рекомендуется conda.
+
+# ---- Core ML ----
+numpy==2.4.2
+pandas==3.0.1
+pyarrow==23.0.1
+scikit-learn==1.8.0
+xgboost==3.2.0
+joblib==1.5.3
+
+# ---- Distributed compute ----
+dask==2026.1.2
+distributed==2026.1.2
+
+# ---- Visualization ----
+matplotlib==3.10.8
+
+# ---- Configuration & logging ----
+pyyaml==6.0.3
+coloredlogs==15.0.1
+
+# ---- Data sourcing ----
+kagglehub==1.0.0
+
+# ---- Web API ----
+fastapi==0.124.0
+uvicorn==0.38.0
+pydantic>=2.7
+
+# ---- Telegram Bot ----
+aiogram>=3.0,<4.0

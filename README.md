@@ -31,15 +31,13 @@ dask_k8s
 hamzaghanmi/expresso-churn-prediction-challenge
 ```
 
-Основные рабочие интерфейсы сейчас — CLI и Web API:
+Три рабочих интерфейса поверх одного core:
 
-```bash
-python -m src.presentation.cli.main <command> --profile <profile>
-```
-
-```bash
-python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --reload
-```
+| Интерфейс | Назначение |
+|---|---|
+| CLI | Локальный запуск и отладка pipeline |
+| Web API | HTTP-интерфейс: health-check, конфигурация, модель, запуск pipeline через `run_id` |
+| Telegram Bot | Push-driven интерфейс для запуска и мониторинга pipeline из чата |
 
 ---
 
@@ -60,7 +58,7 @@ python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --re
 - [Установка окружения](#установка-окружения)
   - [Linux / WSL](#linux--wsl)
   - [Windows](#windows)
-  - [Проверка Python-зависимостей](#проверка-python-зависимостей)
+  - [Pip (альтернатива conda)](#pip-альтернатива-conda)
   - [Основные библиотеки](#основные-библиотеки)
 - [Runtime-профили](#runtime-профили)
   - [Зачем нужны все три режима](#зачем-нужны-все-три-режима)
@@ -74,6 +72,10 @@ python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --re
   - [Запуск локально](#запуск-локально)
   - [Основные endpoints](#основные-endpoints)
   - [Запуск pipeline через run\_id](#запуск-pipeline-через-run_id)
+- [Telegram Bot](#telegram-bot)
+  - [Команды](#команды)
+  - [Жизненный цикл pipeline run](#жизненный-цикл-pipeline-run)
+  - [Настройки бота](#настройки-бота)
 - [Dask Kubernetes](#dask-kubernetes)
   - [Общая схема](#общая-схема)
   - [1. Запуск Minikube](#1-запуск-minikube)
@@ -121,7 +123,6 @@ python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --re
   - [Job не может подключиться к scheduler](#job-не-может-подключиться-к-scheduler)
   - [PVC не монтируется](#pvc-не-монтируется)
   - [Kubernetes не видит локальный image](#kubernetes-не-видит-локальный-image)
-- [Интерфейсы проекта](#интерфейсы-проекта)
 
 ---
 
@@ -190,7 +191,7 @@ docker pull ghcr.io/skerter/distributed-churn-prediction:<release-tag>
 Пример:
 
 ```bash
-docker pull ghcr.io/skerter/distributed-churn-prediction:v0.1.0
+docker pull ghcr.io/skerter/distributed-churn-prediction:v0.3.0
 ```
 
 Если image приватный и pull завершается ошибкой `unauthorized`, нужно либо сделать package публичным, либо настроить `imagePullSecret`.
@@ -295,11 +296,17 @@ conda env create -f environment.yml
 conda activate dist-churn-pred-env
 ```
 
-## Проверка Python-зависимостей
+## Pip (альтернатива conda)
+
+Если conda недоступна, прямые зависимости можно поставить через pip:
 
 ```bash
-python -c "import pandas, dask, distributed, xgboost, pyarrow, kagglehub, coloredlogs; print('env ok')"
+python -m venv .venv
+source .venv/bin/activate          # PowerShell: .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
+
+`requirements.txt` содержит только прямые зависимости приложения (без Jupyter и dev-инструментов) и синхронизирован с pinned-версиями из `environment_linux.yml`. Для разработки и работы с notebook'ами рекомендуется conda — она ставит полный набор инструментов и аккуратнее решает конфликты бинарных wheel'ов для `xgboost`, `pyarrow` и MKL-backed `numpy`.
 
 ## Основные библиотеки
 
@@ -456,10 +463,10 @@ API — это тонкий presentation layer над тем же core, что �
 
 ```text
 HTTP request
-→ FastAPI route
-→ AppContainer
-→ use case
-→ pipeline executor
+FastAPI route
+AppContainer
+use case
+pipeline executor
 ```
 
 Активный runtime-профиль выбирается через переменную окружения `DCP_PROFILE`.
@@ -572,21 +579,84 @@ logs/pipeline_runs
 
 ---
 
+# Telegram Bot
+
+Telegram-бот — третий presentation layer над тем же core, что и CLI/Web API. Бот работает в режиме long-polling и общается с приложением через `AppContainer`:
+
+```text
+Telegram update
+aiogram Router / FSM
+AppContainer
+use case
+pipeline executor
+```
+
+В отличие от Web API, бот не блокируется на ответе: pipeline запускается в отдельном треде, а пользователь получает push-уведомление после завершения. Это естественная модель для долгих запусков (`dask_k8s` может идти десятки минут) и не требует от клиента поллить статус вручную.
+
+## Команды
+
+| Команда | Назначение |
+|---|---|
+| `/start`, `/help` | Приветствие и список доступных команд |
+| `/health` | Состояние приложения: имя, версия, профиль |
+| `/profiles` | Список runtime-профилей с пометкой профиля по умолчанию |
+| `/run` | Запуск pipeline с выбором профиля через inline-клавиатуру |
+| `/stop` | Остановка активного pipeline run |
+| `/status` | Интерактивный диалог: спрашивает `run_id` и возвращает payload |
+| `/model` | Метаданные модели и метрики последнего запуска |
+| `/cancel` | Выход из текущего FSM-диалога |
+
+## Жизненный цикл pipeline run
+
+После нажатия кнопки в `/run` бот запускает pipeline в отдельном треде и сразу возвращает `run_id`:
+
+```text
+/run → выбор профиля
+BotPipelineExecutor.submit()
+pipeline thread started
+ответ боту: run_id
+watch_and_notify (async background task)
+push-уведомление по завершению
+```
+
+Статусы переходов идентичны Web API: `queued → running → succeeded | failed`. Файлы запусков лежат в общем `logs/pipeline_runs`, поэтому `/status` доступен по любому `run_id` — в том числе по другим запускам, инициированным через CLI или HTTP.
+
+Если pipeline не успевает завершиться за `bot.pipeline_timeout_seconds`, `watch_and_notify` выставляет `cancel_event`, помечает run как FAILED и присылает уведомление о таймауте. Команда `/stop` использует тот же механизм, но по инициативе пользователя — благодаря тому, что `BotPipelineExecutor` живёт всё время работы бота и хранит реестр `cancel_event` по `run_id`.
+
+При старте бот вызывает `_recover_stale_runs`: все запуски, оставшиеся в статусе `queued/running` после рестарта процесса, помечаются FAILED — чтобы не зависели от треда из предыдущего процесса.
+
+## Настройки бота
+
+Параметры лежат в `configs/base.yaml`:
+
+```yaml
+bot:
+  admin_chat_ids: []
+  pipeline_timeout_seconds: 7200
+```
+
+| Поле | Значение |
+|---|---|
+| `admin_chat_ids` | Список разрешённых Telegram `user_id`. Пустой список — доступ открыт всем. Непустой — `AuthMiddleware` отклоняет чужих пользователей и пишет WARNING в лог |
+| `pipeline_timeout_seconds` | Жёсткий лимит на один pipeline run в секундах. По умолчанию 7200 (2 часа) |
+
+---
+
 # Dask Kubernetes
 
 ## Общая схема
 
 ```text
 Docker image
-→ GitHub Container Registry
-→ Kubernetes
-→ Dask Operator
-→ DaskCluster
-→ scheduler pod
-→ worker pods
-→ scheduler service
-→ pipeline Job
-→ shared PVC /mnt/dcp
+GitHub Container Registry
+Kubernetes
+Dask Operator
+DaskCluster
+scheduler pod
+worker pods
+scheduler service
+pipeline Job
+shared PVC /mnt/dcp
 ```
 
 В Kubernetes участвуют следующие сущности:
@@ -874,11 +944,11 @@ Workflow:
 
 ```text
 push / manual workflow run
-→ checkout
-→ docker login ghcr.io
-→ docker build
-→ smoke test
-→ docker push
+checkout
+docker login ghcr.io
+docker build
+smoke test
+docker push
 ```
 
 Для обычного рабочего запуска Kubernetes должен ссылаться на заранее выбранный release-tag. Если release-tag меняется, обнови image в GHCR overlay.
@@ -1179,10 +1249,15 @@ distributed-churn-prediction/
 │   ├── infrastructure/
 │   ├── orchestration/
 │   └── presentation/
+│       ├── cli/
+│       ├── api/
+│       └── bot/
 ├── Dockerfile
 ├── Makefile
 ├── environment.yml
 ├── environment_linux.yml
+├── requirements.txt
+├── railway.toml
 └── README.md
 ```
 
@@ -1194,10 +1269,10 @@ distributed-churn-prediction/
 
 ```text
 presentation
-→ application
-→ orchestration
-→ infrastructure
-→ app/bootstrap
+→application
+orchestration
+infrastructure
+app/bootstrap
 ```
 
 ## `presentation`
@@ -1207,23 +1282,31 @@ presentation
 ```text
 src/presentation/cli
 src/presentation/api
+src/presentation/bot
 ```
 
 CLI:
 
-1. читает аргументы;
+1. принимает аргументы;
 2. вызывает bootstrap;
 3. запускает use case;
-4. печатает JSON-ответ.
+4. возвращает JSON-ответ.
 
 Web API:
 
 1. принимает HTTP-запрос;
 2. использует `AppContainer`, созданный при старте приложения;
-3. вызывает application use cases;
+3. запускает use cases;
 4. возвращает JSON-ответ.
 
-Для запуска pipeline в Web API используется workflow с `run_id`: API создаёт запуск, возвращает идентификатор, а состояние проверяется отдельным GET-запросом.
+Telegram Bot:
+
+1. принимает Telegram update через long-polling;
+2. использует `AppContainer` и долгоживущий `BotPipelineExecutor`, созданные при старте бота;
+3. вызывает use cases в обработчиках команд;
+4. запускает pipeline в отдельном треде и отправляет push-уведомление по завершению.
+
+И Web API, и бот используют одинаковый workflow с `run_id` поверх `FilePipelineRunStore`: запуск создаётся отдельно, статус доступен по идентификатору. Это позволяет одному и тому же `run_id`, созданному через HTTP, проверять через `/status` в Telegram — и наоборот.
 
 ## `application`
 
@@ -1357,17 +1440,3 @@ make minikube-build
 eval $(minikube docker-env)
 docker images | grep dcp-pipeline
 ```
-
----
-
-# Интерфейсы проекта
-
-Сейчас в проекте есть несколько интерфейсных направлений:
-
-| Интерфейс | Статус | Назначение |
-|---|---|---|
-| CLI | Реализован | Локальный запуск и отладка pipeline |
-| Web API | Реализован | HTTP-интерфейс для health-check, конфигурации, модели и запуска pipeline через `run_id` |
-| Telegram Bot | Планируется | Пользовательский интерфейс поверх application layer |
-
-CLI и Web API используют один и тот же core: `bootstrap`, `AppContainer`, application use cases и pipeline'ы.
