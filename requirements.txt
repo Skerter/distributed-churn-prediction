@@ -33,3 +33,7 @@ pydantic>=2.7
 
 # ---- Telegram Bot ----
 aiogram>=3.0,<4.0
+
+# ---- MLOps ----
+mlflow==2.19.0
+psycopg2-binary>=2.9,<3

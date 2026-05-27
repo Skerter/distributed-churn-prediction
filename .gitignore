@@ -25,6 +25,9 @@ models/
 *.joblib
 *.json
 
+# MLFlow local tracking data
+mlruns/
+
 # Generated plots
 notebooks/eval_plots/
 notebooks/model_plots/
