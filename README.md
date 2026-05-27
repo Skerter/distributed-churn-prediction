@@ -31,13 +31,21 @@ dask_k8s
 hamzaghanmi/expresso-churn-prediction-challenge
 ```
 
-Три рабочих интерфейса поверх одного core:
+Четыре рабочих интерфейса поверх одного core:
 
 | Интерфейс | Назначение |
 |---|---|
 | CLI | Локальный запуск и отладка pipeline |
 | Web API | HTTP-интерфейс: health-check, конфигурация, модель, запуск pipeline через `run_id` |
-| Telegram Bot | Push-driven интерфейс для запуска и мониторинга pipeline из чата |
+| [Frontend Dashboard](https://frontend-production-a2ef.up.railway.app/) | Статический веб-дашборд поверх Web API: запуск пайплайна, мониторинг, история, статистика |
+| [Telegram Bot](https://t.me/dcp_pipeline_bot) | Push-driven интерфейс для запуска и мониторинга pipeline из чата |
+
+> 🚀 **Live demo:** [frontend-production-a2ef.up.railway.app](https://frontend-production-a2ef.up.railway.app/) · бот в Telegram: [@dcp_pipeline_bot](https://t.me/dcp_pipeline_bot)
+
+Дополнительно:
+
+- **MLflow tracking** — параметры и метрики каждого обучения логируются в эксперимент `churn-prediction`
+- **Pytest** — smoke / unit / integration тесты с маркерами для быстрых проверок
 
 ---
 
@@ -72,10 +80,20 @@ hamzaghanmi/expresso-churn-prediction-challenge
   - [Запуск локально](#запуск-локально)
   - [Основные endpoints](#основные-endpoints)
   - [Запуск pipeline через run\_id](#запуск-pipeline-через-run_id)
+- [Frontend Dashboard](#frontend-dashboard)
+  - [Возможности](#возможности)
+  - [Запуск локально](#запуск-локально-1)
 - [Telegram Bot](#telegram-bot)
   - [Команды](#команды)
   - [Жизненный цикл pipeline run](#жизненный-цикл-pipeline-run)
   - [Настройки бота](#настройки-бота)
+- [Тесты](#тесты)
+  - [Структура тестов](#структура-тестов)
+  - [Маркеры pytest](#маркеры-pytest)
+  - [Запуск тестов](#запуск-тестов)
+- [MLflow Tracking](#mlflow-tracking)
+  - [Что логируется](#что-логируется)
+  - [MLflow UI локально](#mlflow-ui-локально)
 - [Dask Kubernetes](#dask-kubernetes)
   - [Общая схема](#общая-схема)
   - [1. Запуск Minikube](#1-запуск-minikube)
@@ -579,7 +597,50 @@ logs/pipeline_runs
 
 ---
 
+# Frontend Dashboard
+
+> 🌐 **Live:** [https://frontend-production-a2ef.up.railway.app/](https://frontend-production-a2ef.up.railway.app/)
+
+`frontend/` — статический веб-дашборд для управления Web API из браузера. Чистый HTML/CSS/Vanilla JS, без сборщиков и npm-зависимостей.
+
+Дашборд — это удобная альтернатива Swagger UI и curl-командам: запустил один сервер с фронтом, открыл вкладку в браузере — и управляешь пайплайном кликами.
+
+## Возможности
+
+| Блок | Назначение |
+|---|---|
+| Health Check | Проверка статуса API одной кнопкой, индикатор подключения в шапке |
+| Запуск ML Pipeline | Запуск с чекбоксами `execute`, `skip_load`, `skip_features`, `skip_train`, `skip_eval` и пресетами (Полный прогон / Только обучение / Dry-run / Сброс) |
+| Статус пайплайна | Мониторинг текущего запуска по `run_id`: бейдж статуса, прогресс-бар по этапам (Loading → Features → Training → Eval → Done), таймер длительности, автополлинг каждые 3 секунды |
+| История запусков | Последние 10 пайплайнов текущей сессии — сохраняется в `localStorage`, переживает перезагрузку страницы |
+| Статистика | Живые счётчики: всего запусков, успешные, ошибки, среднее время выполнения |
+| Темы | Светлая / тёмная тема с автоопределением системной и сохранением выбора |
+| Горячие клавиши | `H` — health, `R` — run, `S` — status, `T` — тема, `C` — копировать `run_id`, `?` — подсказка в консоли |
+| Уведомления | Toast-сообщения об успехе/ошибке запросов в правом нижнем углу |
+
+## Запуск локально
+
+Сначала подними Web API (см. раздел [Web API](#web-api)), затем запусти статический сервер для фронтенда:
+
+```bash
+python -m http.server 3000 --directory frontend
+```
+
+Открой в браузере:
+
+```text
+http://localhost:3000
+```
+
+Альтернативно — расширение **Live Server** для VS Code (правый клик по `frontend/index.html` → *Open with Live Server*).
+
+По умолчанию фронтенд обращается к `http://127.0.0.1:8000`. Текущий API-URL виден в шапке справа.
+
+---
+
 # Telegram Bot
+
+> 💬 **Бот в Telegram:** [@dcp_pipeline_bot](https://t.me/dcp_pipeline_bot)
 
 Telegram-бот — третий presentation layer над тем же core, что и CLI/Web API. Бот работает в режиме long-polling и общается с приложением через `AppContainer`:
 
@@ -639,6 +700,97 @@ bot:
 |---|---|
 | `admin_chat_ids` | Список разрешённых Telegram `user_id`. Пустой список — доступ открыт всем. Непустой — `AuthMiddleware` отклоняет чужих пользователей и пишет WARNING в лог |
 | `pipeline_timeout_seconds` | Жёсткий лимит на один pipeline run в секундах. По умолчанию 7200 (2 часа) |
+
+---
+
+# Тесты
+
+Проект использует `pytest`. Тесты разделены по слоям и помечены маркерами — это позволяет запускать только нужное подмножество (например, быстрые smoke-тесты перед коммитом).
+
+## Структура тестов
+
+```text
+tests/
+├── smoke/         # быстрые проверки импортов и сборки модулей
+├── unit/          # изолированные тесты Settings, AppContainer
+└── integration/   # интеграционные проверки сборки pipeline-модулей
+```
+
+## Маркеры pytest
+
+| Маркер | Что покрывает |
+|---|---|
+| `smoke` | Минимальные проверки, что приложение собирается и ключевые модули импортируются |
+| `unit` | Изолированные тесты компонентов (`Settings`, `AppContainer`) с подставленными зависимостями |
+| `integration` | Проверки, требующие нескольких слоёв вместе (например, импорт pipeline-сценария) |
+
+## Запуск тестов
+
+Все тесты:
+
+```bash
+pytest
+```
+
+Только быстрые smoke-тесты:
+
+```bash
+pytest -m smoke
+```
+
+Только unit или integration:
+
+```bash
+pytest -m unit
+pytest -m integration
+```
+
+Конкретный файл или тест:
+
+```bash
+pytest tests/unit/test_settings_unit.py
+pytest tests/unit/test_settings_unit.py::test_settings_creation
+```
+
+Конфиг лежит в `pytest.ini` — корень проекта уже добавлен в `pythonpath`, поэтому импорты вида `from src.app...` работают из коробки.
+
+---
+
+# MLflow Tracking
+
+Проект логирует параметры обучения и метрики через **MLflow**. Логирование встроено в `train_service` и работает в обоих локальных режимах (`pandas` и `dask_local`). Если MLflow по какой-то причине недоступен, pipeline не падает — пишется WARNING в лог.
+
+## Что логируется
+
+Все запуски пишутся в эксперимент `churn-prediction`. Для каждого запуска:
+
+**Параметры:**
+
+- `runtime_mode` — `pandas` или `dask_local`
+- `model_name`, `model_version`
+- XGBoost-гиперпараметры: `objective`, `eval_metric`, `max_depth`, `learning_rate`, `n_estimators`, `subsample`, `colsample_bytree`, `random_state`, `n_jobs`
+
+**Метрики:**
+
+- `train_rows`, `val_rows` — размеры выборок
+- `train_target_rate`, `val_target_rate` — доля положительного класса
+- `best_iteration` — лучшая итерация бустинга (если доступна)
+
+Это позволяет сравнивать запуски между runtime-профилями, отслеживать влияние гиперпараметров и не терять историю экспериментов.
+
+## MLflow UI локально
+
+По умолчанию runs пишутся в `mlflow/mlruns/`. Открыть веб-интерфейс с фильтрами, графиками и сравнением запусков:
+
+```bash
+mlflow ui --backend-store-uri ./mlflow/mlruns --port 5000
+```
+
+Открой в браузере:
+
+```text
+http://127.0.0.1:5000
+```
 
 ---
 
@@ -1235,6 +1387,10 @@ distributed-churn-prediction/
 │   ├── pandas.yaml
 │   ├── dask_local.yaml
 │   └── dask_k8s.yaml
+├── frontend/                # статический веб-дашборд (HTML/CSS/JS)
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
 ├── k8s/
 │   ├── base/
 │   │   ├── cluster/
@@ -1243,6 +1399,10 @@ distributed-churn-prediction/
 │   │   ├── ghcr/
 │   │   └── minikube-local/
 │   └── operator/
+├── mlflow/                  # MLflow tracking: runs и UI
+│   └── mlruns/
+├── notebooks/
+│   └── eval_plots/          # графики оценки модели
 ├── src/
 │   ├── app/
 │   ├── application/
@@ -1252,12 +1412,16 @@ distributed-churn-prediction/
 │       ├── cli/
 │       ├── api/
 │       └── bot/
+├── tests/                   # smoke / unit / integration тесты
+│   ├── smoke/
+│   ├── unit/
+│   └── integration/
 ├── Dockerfile
 ├── Makefile
 ├── environment.yml
 ├── environment_linux.yml
 ├── requirements.txt
-├── railway.toml
+├── pytest.ini
 └── README.md
 ```
 
