@@ -1,2 +1,6 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "mlflow/Dockerfile"
+
 [deploy]
 startCommand = ""
