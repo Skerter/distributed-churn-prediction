@@ -3,6 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "/app/start_web.sh"
+startCommand = "bash /app/start_web.sh"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
