@@ -9,6 +9,8 @@ RUN micromamba env create -f /tmp/environment_linux.yml && \
 
 COPY src /app/src
 COPY configs /app/configs
+COPY start_web.sh /app/start_web.sh
+RUN chmod +x /app/start_web.sh
 
 ENV MAMBA_DOCKERFILE_ACTIVATE=1
 ENV PYTHONPATH=/app
