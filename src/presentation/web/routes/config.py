@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 
 from src.app.container import AppContainer
 from src.application.use_cases.get_config_summary import get_config_summary
-from src.presentation.api.dependencies import get_container
-from src.presentation.api.schemas import ConfigSummaryApiResponse
+from src.presentation.web.dependencies import get_container
+from src.presentation.web.schemas import ConfigSummaryApiResponse
 
 router = APIRouter(prefix="/config", tags=["config"])
 

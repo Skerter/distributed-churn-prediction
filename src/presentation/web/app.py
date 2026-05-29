@@ -10,12 +10,12 @@ from src.app.bootstrap import bootstrap
 from src.infrastructure.execution.dask_client import close_dask_client
 from src.infrastructure.execution.pipeline_executor_factory import build_pipeline_executor
 from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
-from src.presentation.api.exception_handlers import register_exception_handlers
-from src.presentation.api.routes.config import router as config_router
-from src.presentation.api.routes.health import router as health_router
-from src.presentation.api.routes.model import router as model_router
-from src.presentation.api.routes.profiles import router as profiles_router
-from src.presentation.api.routes.pipeline_runs import router as pipeline_runs_router
+from src.presentation.web.exception_handlers import register_exception_handlers
+from src.presentation.web.routes.config import router as config_router
+from src.presentation.web.routes.health import router as health_router
+from src.presentation.web.routes.model import router as model_router
+from src.presentation.web.routes.profiles import router as profiles_router
+from src.presentation.web.routes.pipeline_runs import router as pipeline_runs_router
 
 
 @asynccontextmanager
@@ -59,7 +59,7 @@ def create_app() -> FastAPI:
             "HTTP-адаптер над application layer проекта "
             "distributed-churn-prediction."
         ),
-        version="0.1.0",
+        version="0.4.0",
         lifespan=lifespan,
     )
 

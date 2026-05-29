@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 
 from src.app.container import AppContainer
 from src.application.use_cases.get_health import get_health
-from src.presentation.api.dependencies import get_container
-from src.presentation.api.schemas import HealthApiResponse
+from src.presentation.web.dependencies import get_container
+from src.presentation.web.schemas import HealthApiResponse
 
 router = APIRouter(tags=["health"])
 

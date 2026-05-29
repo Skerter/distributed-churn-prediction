@@ -2,14 +2,14 @@ FROM mambaorg/micromamba:1.5.10
 
 WORKDIR /app
 
-COPY environment_linux.yml /tmp/environment_linux.yml
+COPY docker/environment.linux.yml /tmp/environment.linux.yml
 
-RUN micromamba env create -f /tmp/environment_linux.yml && \
+RUN micromamba env create -f /tmp/environment.linux.yml && \
     micromamba clean --all --yes
 
 COPY src /app/src
 COPY configs /app/configs
-COPY start_web.sh /app/start_web.sh
+COPY docker/start-web.sh /app/start-web.sh
 
 ENV MAMBA_DOCKERFILE_ACTIVATE=1
 ENV PYTHONPATH=/app

@@ -14,8 +14,7 @@ logs/
 archive/
 
 # Datasets
-data/source/
-data/processed/
+data/
 *.csv
 *.parquet
 
@@ -31,6 +30,9 @@ mlruns/
 # Generated plots
 notebooks/eval_plots/
 notebooks/model_plots/
+
+# Claude AI local files
+CLAUDE.md
 
 # Python cache
 __pycache__/

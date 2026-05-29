@@ -1,8 +1,0 @@
-[build]
-builder = "dockerfile"
-dockerfilePath = "Dockerfile"
-
-[deploy]
-startCommand = "bash /app/start_web.sh"
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3

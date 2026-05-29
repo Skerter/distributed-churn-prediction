@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - make-k8s-pipeline-v1
     tags:
       - "v*.*.*"
   workflow_dispatch:
@@ -61,6 +60,7 @@ jobs:
         shell: bash
         run: |
           docker build \
+            -f docker/Dockerfile \
             -t "${IMAGE_NAME}:${{ steps.tags.outputs.primary_tag }}" \
             -t "${IMAGE_NAME}:${{ steps.tags.outputs.sha_tag }}" \
             .

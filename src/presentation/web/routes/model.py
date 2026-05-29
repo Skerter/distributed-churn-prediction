@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 
 from src.app.container import AppContainer
 from src.application.use_cases.get_model_info import get_model_info
-from src.presentation.api.dependencies import get_container
-from src.presentation.api.schemas import ModelInfoApiResponse
+from src.presentation.web.dependencies import get_container
+from src.presentation.web.schemas import ModelInfoApiResponse
 
 router = APIRouter(prefix="/model", tags=["model"])
 

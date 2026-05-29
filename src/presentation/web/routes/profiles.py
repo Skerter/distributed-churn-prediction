@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from src.application.use_cases.list_profiles import list_profiles
-from src.presentation.api.schemas import ProfilesApiResponse
+from src.presentation.web.schemas import ProfilesApiResponse
 
 router = APIRouter(tags=["profiles"])
 

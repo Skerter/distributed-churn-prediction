@@ -18,7 +18,7 @@ api:
   kubernetes:
     namespace: "default"
     job_name_prefix: "dcp-pipeline"
-    job_image: "ghcr.io/skerter/distributed-churn-prediction:v0.1.0"
+    job_image: "ghcr.io/skerter/distributed-churn-prediction:v0.4.0"
     image_pull_policy: "IfNotPresent"
     storage_pvc_name: "dcp-storage"
     storage_mount_path: "/mnt/dcp"

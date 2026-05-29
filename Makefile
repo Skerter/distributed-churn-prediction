@@ -98,18 +98,18 @@ help:
 .PHONY: minikube-build
 minikube-build:
 	@echo "Сборка $(LOCAL_IMAGE_REF) внутри Docker daemon Minikube..."
-	@eval $$(minikube docker-env) && docker build -t $(LOCAL_IMAGE_REF) .
+	@eval $$(minikube docker-env) && docker build -f docker/Dockerfile -t $(LOCAL_IMAGE_REF) .
 	@echo "Готово: $(LOCAL_IMAGE_REF)"
 
 .PHONY: local-build
 local-build:
 	@echo "Сборка $(LOCAL_IMAGE_REF) в текущем Docker daemon..."
-	docker build -t $(LOCAL_IMAGE_REF) .
+	docker build -f docker/Dockerfile -t $(LOCAL_IMAGE_REF) .
 
 .PHONY: ghcr-build
 ghcr-build:
 	@echo "Сборка GHCR image: $(GHCR_IMAGE_REF)"
-	docker build -t $(GHCR_IMAGE_REF) .
+	docker build -f docker/Dockerfile -t $(GHCR_IMAGE_REF) .
 
 .PHONY: ghcr-push
 ghcr-push:

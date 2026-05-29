@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends
 from src.application.dto.requests import CreatePipelineRunRequest
 from src.application.use_cases.create_pipeline_run import create_pipeline_run
 from src.application.use_cases.get_pipeline_run import get_pipeline_run
-from src.presentation.api.dependencies import get_pipeline_executor
-from src.presentation.api.schemas import (
+from src.presentation.web.dependencies import get_pipeline_executor
+from src.presentation.web.schemas import (
     CreatePipelineRunApiRequest,
     PipelineRunApiResponse,
 )

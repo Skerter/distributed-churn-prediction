@@ -209,7 +209,7 @@ docker pull ghcr.io/skerter/distributed-churn-prediction:<release-tag>
 Пример:
 
 ```bash
-docker pull ghcr.io/skerter/distributed-churn-prediction:v0.3.0
+docker pull ghcr.io/skerter/distributed-churn-prediction:v0.4.0
 ```
 
 Если image приватный и pull завершается ошибкой `unauthorized`, нужно либо сделать package публичным, либо настроить `imagePullSecret`.
@@ -303,14 +303,14 @@ cd distributed-churn-prediction
 ## Linux / WSL
 
 ```bash
-conda env create -f environment_linux.yml
+conda env create -f docker/environment.linux.yml
 conda activate dist-churn-pred-env
 ```
 
 ## Windows
 
 ```powershell
-conda env create -f environment.yml
+conda env create -f environment.windows.yml
 conda activate dist-churn-pred-env
 ```
 
@@ -324,11 +324,11 @@ source .venv/bin/activate          # PowerShell: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-`requirements.txt` содержит только прямые зависимости приложения (без Jupyter и dev-инструментов) и синхронизирован с pinned-версиями из `environment_linux.yml`. Для разработки и работы с notebook'ами рекомендуется conda — она ставит полный набор инструментов и аккуратнее решает конфликты бинарных wheel'ов для `xgboost`, `pyarrow` и MKL-backed `numpy`.
+`requirements.txt` содержит только прямые зависимости приложения (без Jupyter и dev-инструментов) и синхронизирован с pinned-версиями из `docker/environment.linux.yml`. Для разработки и работы с notebook'ами рекомендуется conda — она ставит полный набор инструментов и аккуратнее решает конфликты бинарных wheel'ов для `xgboost`, `pyarrow` и MKL-backed `numpy`.
 
 ## Основные библиотеки
 
-Полный список зависимостей находится в `environment.yml` и `environment_linux.yml`.
+Полный список зависимостей находится в `environment.windows.yml` (Windows) и `docker/environment.linux.yml` (Linux/Docker).
 
 Ключевые библиотеки:
 
@@ -497,7 +497,7 @@ Windows cmd:
 cd C:\vs_code_projects\distributed-churn-prediction
 conda activate dist-churn-pred-env
 set DCP_PROFILE=pandas
-python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn src.presentation.web.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 PowerShell:
@@ -506,7 +506,7 @@ PowerShell:
 cd C:\vs_code_projects\distributed-churn-prediction
 conda activate dist-churn-pred-env
 $env:DCP_PROFILE="pandas"
-python -m uvicorn src.presentation.api.app:app --host 127.0.0.1 --port 8000 --reload
+python -m uvicorn src.presentation.web.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Swagger UI:
@@ -752,7 +752,7 @@ pytest tests/unit/test_settings_unit.py
 pytest tests/unit/test_settings_unit.py::test_settings_creation
 ```
 
-Конфиг лежит в `pytest.ini` — корень проекта уже добавлен в `pythonpath`, поэтому импорты вида `from src.app...` работают из коробки.
+Конфиг лежит в `pyproject.toml` (секция `[tool.pytest.ini_options]`) — корень проекта уже добавлен в `pythonpath`, поэтому импорты вида `from src.app...` работают из коробки.
 
 ---
 
@@ -915,7 +915,7 @@ docker pull ghcr.io/skerter/distributed-churn-prediction:<release-tag>
 Пример:
 
 ```bash
-docker pull ghcr.io/skerter/distributed-churn-prediction:v0.1.0
+docker pull ghcr.io/skerter/distributed-churn-prediction:v0.4.0
 ```
 
 Если package публичный, Kubernetes сможет скачать image без `imagePullSecret`.
@@ -1077,7 +1077,7 @@ ghcr.io/skerter/distributed-churn-prediction
 Для стабильных запусков рекомендуется использовать release-tag:
 
 ```text
-ghcr.io/skerter/distributed-churn-prediction:v0.1.0
+ghcr.io/skerter/distributed-churn-prediction:v0.4.0
 ```
 
 Именно release-tag должен использоваться в Kubernetes manifests, когда нужна воспроизводимость.
@@ -1387,6 +1387,15 @@ distributed-churn-prediction/
 │   ├── pandas.yaml
 │   ├── dask_local.yaml
 │   └── dask_k8s.yaml
+├── deploy/
+│   └── railway/             # Railway-конфиги по сервисам
+│       ├── railway.bot.toml
+│       ├── railway.backend.toml
+│       └── railway.frontend.toml
+├── docker/                  # Docker/контейнерные файлы
+│   ├── Dockerfile
+│   ├── environment.linux.yml
+│   └── start-web.sh
 ├── frontend/                # статический веб-дашборд (HTML/CSS/JS)
 │   ├── index.html
 │   ├── style.css
@@ -1410,18 +1419,16 @@ distributed-churn-prediction/
 │   ├── orchestration/
 │   └── presentation/
 │       ├── cli/
-│       ├── api/
+│       ├── web/
 │       └── bot/
 ├── tests/                   # smoke / unit / integration тесты
 │   ├── smoke/
 │   ├── unit/
 │   └── integration/
-├── Dockerfile
-├── Makefile
-├── environment.yml
-├── environment_linux.yml
+├── environment.windows.yml
 ├── requirements.txt
-├── pytest.ini
+├── pyproject.toml
+├── Makefile
 └── README.md
 ```
 
@@ -1445,7 +1452,7 @@ app/bootstrap
 
 ```text
 src/presentation/cli
-src/presentation/api
+src/presentation/web
 src/presentation/bot
 ```
 

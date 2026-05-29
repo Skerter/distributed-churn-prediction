@@ -1,0 +1,8 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "docker/Dockerfile"
+
+[deploy]
+startCommand = "python -m src.presentation.bot.main --profile pandas"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

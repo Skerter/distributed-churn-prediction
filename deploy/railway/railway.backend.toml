@@ -1,8 +1,8 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "docker/Dockerfile"
 
 [deploy]
-startCommand = "python -m src.presentation.bot.main --profile pandas"
+startCommand = "bash /app/start-web.sh"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
