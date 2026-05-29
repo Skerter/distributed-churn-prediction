@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.app.bootstrap import bootstrap
 from src.infrastructure.execution.dask_client import close_dask_client
@@ -50,6 +51,24 @@ async def lifespan(api_app: FastAPI) -> AsyncIterator[None]:
         container.logger.info("Web API остановлен")
     
 
+def _get_allowed_origins() -> list[str]:
+    """Возвращает список допустимых CORS-origin'ов.
+
+    По умолчанию — Railway frontend. Можно расширить через env-переменную
+    ``ALLOWED_ORIGINS`` (значения через запятую):
+
+        ALLOWED_ORIGINS=https://my-frontend.up.railway.app,http://localhost:3000
+    """
+    default_origins = [
+        "https://frontend-production-a2ef.up.railway.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    env_origins = os.getenv("ALLOWED_ORIGINS", "")
+    extra = [o.strip() for o in env_origins.split(",") if o.strip()]
+    return default_origins + extra
+
+
 def create_app() -> FastAPI:
     """Создаёт FastAPI-приложение для HTTP-интерфейса проекта."""
 
@@ -61,6 +80,16 @@ def create_app() -> FastAPI:
         ),
         version="0.4.0",
         lifespan=lifespan,
+    )
+
+    # CORS: разрешаем запросы с Railway-фронтенда и localhost для разработки.
+    # Список origin'ов можно расширить через env ALLOWED_ORIGINS.
+    api_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_get_allowed_origins(),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     register_exception_handlers(api_app)

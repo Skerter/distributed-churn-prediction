@@ -904,6 +904,9 @@ window.addEventListener('beforeunload', () => {
     stopDurationTimer();
 });
 
+// Показываем реальный адрес бэкенда в заголовке
+document.getElementById('apiUrl').textContent = API_BASE_URL;
+
 // Восстанавливаем историю и отрисовываем
 loadHistory();
 renderHistory();
