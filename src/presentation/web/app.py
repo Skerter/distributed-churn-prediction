@@ -19,16 +19,35 @@ from src.presentation.web.routes.profiles import router as profiles_router
 from src.presentation.web.routes.pipeline_runs import router as pipeline_runs_router
 
 
+def _recover_stale_runs(run_store: FilePipelineRunStore, logger) -> None:
+    """Помечает FAILED все runs, оставшиеся в статусе QUEUED/RUNNING после рестарта.
+
+    При OOM или SIGKILL процесс убивается без graceful shutdown — finally-блоки
+    executor'а не успевают вызвать mark_failed(). При следующем старте API
+    эти runs остаются «вечно running». Функция исправляет их статус.
+    """
+    stale = run_store.list_active_runs()
+    for run_id in stale:
+        run_store.mark_failed(run_id, error="Прервано: сервер был перезапущен")
+        logger.warning("Stale run помечен FAILED: %s", run_id)
+    if stale:
+        logger.info("Восстановлено stale runs при старте Web API: %d", len(stale))
+
+
 @asynccontextmanager
 async def lifespan(api_app: FastAPI) -> AsyncIterator[None]:
     profile = os.getenv("DCP_PROFILE", "pandas")
 
     container = bootstrap(profile=profile, init_dask_client=False)
     api_app.state.container = container
-    
+
     run_store = FilePipelineRunStore(
         root_dir=container.settings.logs_dir / "pipeline_runs",
     )
+
+    # Помечаем FAILED все runs, прерванные предыдущим падением процесса (OOM, SIGKILL и т.п.)
+    _recover_stale_runs(run_store, container.logger)
+
     pipeline_executor = build_pipeline_executor(
         container=container,
         store=run_store,
