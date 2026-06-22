@@ -1,5 +1,9 @@
 # Distributed Churn Prediction
 
+![Tests](https://github.com/Skerter/distributed-churn-prediction/actions/workflows/tests.yml/badge.svg)
+![Build](https://github.com/Skerter/distributed-churn-prediction/actions/workflows/build.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 `distributed-churn-prediction` — учебно-инженерный ML/MLOps-проект для задачи предсказания оттока клиентов.
 
 Проект показывает один и тот же ML workflow в трёх режимах выполнения:
@@ -707,6 +711,8 @@ bot:
 
 Проект использует `pytest`. Тесты разделены по слоям и помечены маркерами — это позволяет запускать только нужное подмножество (например, быстрые smoke-тесты перед коммитом).
 
+Тесты также запускаются автоматически в CI (`.github/workflows/tests.yml`) на каждый push и pull request в `main`.
+
 ## Структура тестов
 
 ```text
@@ -1084,13 +1090,14 @@ ghcr.io/skerter/distributed-churn-prediction:v0.4.0
 
 ## GitHub Actions
 
-Workflow:
+Проект использует два workflow:
 
 ```text
-.github/workflows/docker-ghcr.yml
+.github/workflows/build.yml
+.github/workflows/tests.yml
 ```
 
-Он автоматизирует сборку и публикацию image.
+`build.yml` автоматизирует сборку и публикацию Docker image в GHCR.
 
 Общая логика:
 
@@ -1101,6 +1108,16 @@ docker login ghcr.io
 docker build
 smoke test
 docker push
+```
+
+`tests.yml` запускает `pytest` на каждый push и pull request в `main`:
+
+```text
+push / pull_request / manual workflow run
+checkout
+setup-python 3.11
+pip install -r requirements.txt
+pytest -q
 ```
 
 Для обычного рабочего запуска Kubernetes должен ссылаться на заранее выбранный release-tag. Если release-tag меняется, обнови image в GHCR overlay.

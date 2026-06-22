@@ -6,3 +6,22 @@ markers = [
     "unit: unit tests",
     "integration: integration tests",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# Набор правил:
+#   E, W  — pycodestyle (стиль/отступы)
+#   F     — pyflakes (неиспользуемые импорты/переменные, реальные ошибки)
+#   I     — isort (порядок импортов)
+#   UP    — pyupgrade (современный синтаксис под target-version)
+#   B     — flake8-bugbear (типичные баги-ловушки)
+#   C4    — flake8-comprehensions (более чистые comprehensions)
+select = ["E", "W", "F", "I", "UP", "B", "C4"]
+
+[tool.ruff.lint.per-file-ignores]
+# smoke-тесты часто просто импортируют модули ради проверки сборки.
+"tests/**" = ["F401"]

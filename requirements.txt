@@ -37,3 +37,6 @@ aiogram>=3.0,<4.0
 # ---- MLOps ----
 mlflow==2.19.0
 psycopg2-binary>=2.9,<3
+
+# ---- Dev / Testing ----
+pytest==8.3.4

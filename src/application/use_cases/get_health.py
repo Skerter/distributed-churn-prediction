@@ -1,5 +1,5 @@
-from src.application.dto.responses import HealthResponse
 from src.app.container import AppContainer
+from src.application.dto.responses import HealthResponse
 
 
 def get_health(container: AppContainer) -> HealthResponse:

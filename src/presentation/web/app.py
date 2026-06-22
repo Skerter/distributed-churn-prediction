@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,8 +15,8 @@ from src.presentation.web.exception_handlers import register_exception_handlers
 from src.presentation.web.routes.config import router as config_router
 from src.presentation.web.routes.health import router as health_router
 from src.presentation.web.routes.model import router as model_router
-from src.presentation.web.routes.profiles import router as profiles_router
 from src.presentation.web.routes.pipeline_runs import router as pipeline_runs_router
+from src.presentation.web.routes.profiles import router as profiles_router
 
 
 def _recover_stale_runs(run_store: FilePipelineRunStore, logger) -> None:
@@ -68,7 +68,7 @@ async def lifespan(api_app: FastAPI) -> AsyncIterator[None]:
     finally:
         close_dask_client(container.dask_client, container.logger)
         container.logger.info("Web API остановлен")
-    
+
 
 def _get_allowed_origins() -> list[str]:
     """Возвращает список допустимых CORS-origin'ов.

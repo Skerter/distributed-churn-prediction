@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from src.application.dto.requests import CreatePipelineRunRequest
 from src.app.settings import Settings
+from src.application.dto.requests import CreatePipelineRunRequest
 from src.infrastructure.pipeline_runs.file_store import FilePipelineRunStore
 from src.shared.enums import PipelineExecutorKind, PipelineRunStatus
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(tz=timezone.utc).isoformat()
+    return datetime.now(tz=UTC).isoformat()
 
 
 def _new_run_id(profile: str) -> str:
-    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now(tz=UTC).strftime("%Y%m%d-%H%M%S")
     suffix = uuid4().hex[:8]
     return f"{timestamp}-{profile.replace('_', '-')}-{suffix}"
 

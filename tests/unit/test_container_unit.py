@@ -1,11 +1,10 @@
-from pathlib import Path
 import logging
+from pathlib import Path
 
 import pytest
-
 from src.app.container import AppContainer
 from src.app.settings import Settings
-from src.shared.enums import RuntimeMode, PipelineExecutorKind
+from src.shared.enums import PipelineExecutorKind, RuntimeMode
 
 
 @pytest.mark.unit

@@ -37,7 +37,7 @@ class DaskLocalPipeline(BasePipeline):
 
         self.logger.info("Dask client успешно передан в pipeline")
         self.logger.debug("client_type=%s", type(self.client).__name__)
-        
+
         dashboard_link = None
         try:
             dashboard_link = getattr(self.client, "dashboard_link", None)
@@ -47,13 +47,13 @@ class DaskLocalPipeline(BasePipeline):
                 self.logger.warning("У Dask client не найден dashboard_link")
         except Exception as exc:
             self.logger.warning("Не удалось получить dashboard_link: %s", exc)
-        
+
         if self.run_options["skip_features"] and (not self.run_options["skip_train"] or not self.run_options["skip_eval"]):
             self.logger.warning("Пропущен шаг features. Ожидается, что parquet-артефакты уже существуют.")
 
         if self.run_options["skip_train"] and not self.run_options["skip_eval"]:
             self.logger.warning("Пропущен шаг train. Ожидается, что обученная модель уже существует.")
-            
+
         executed_steps = []
         skipped_steps = []
         artifacts = {
@@ -65,7 +65,7 @@ class DaskLocalPipeline(BasePipeline):
         }
 
         self.logger.info("Проверка конфигурации пайпайна")
-    
+
         if self.config.runtime.mode.value != "dask_local":
             self.logger.warning("DaskLocalPipeline ожидает runtime.mode='dask_local', но получено %s", self.config.runtime.mode.value)
             raise RuntimeError(f"DaskLocalPipeline ожидает runtime.mode='dask_local', но получено '{self.config.runtime.mode.value}'")
@@ -101,7 +101,7 @@ class DaskLocalPipeline(BasePipeline):
                 client=self.client,
             )
             executed_steps.append("features")
-        
+
         if self.run_options['skip_train']:
             self.logger.warning("Шаг train пропущен")
             skipped_steps.append("train")

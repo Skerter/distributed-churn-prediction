@@ -52,7 +52,7 @@ async def watch_and_notify(
             loop.run_in_executor(None, thread.join),
             timeout=float(timeout_seconds),
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         cancel_event.set()
         run_store.mark_failed(run_id, error=f"Таймаут: превышен лимит {timeout_seconds}s")
         logger.warning(

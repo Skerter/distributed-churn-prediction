@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.shared.enums import RuntimeMode, PipelineExecutorKind
+from src.shared.enums import PipelineExecutorKind, RuntimeMode
 from src.shared.exceptions import ConfigError
 
 
@@ -91,7 +91,7 @@ class TrainingSettings:
 @dataclass(slots=True)
 class EvaluationSettings:
     top_fraction: float = 0.1
-    
+
 
 @dataclass(slots=True)
 class ApiKubernetesSettings:
@@ -260,7 +260,7 @@ class Settings:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], project_root: Path) -> "Settings":
+    def from_dict(cls, data: dict[str, Any], project_root: Path) -> Settings:
         try:
             app_data = data["app"]
             paths_data = data["paths"]

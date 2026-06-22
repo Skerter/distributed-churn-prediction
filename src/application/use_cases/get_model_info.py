@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +32,7 @@ def _build_file_info(path: Path) -> dict[str, Any]:
     result["size_bytes"] = int(stat.st_size)
     result["modified_at"] = datetime.fromtimestamp(
         stat.st_mtime,
-        tz=timezone.utc,
+        tz=UTC,
     ).isoformat()
 
     return result

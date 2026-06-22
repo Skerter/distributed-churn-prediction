@@ -3,10 +3,10 @@ from __future__ import annotations
 from logging import Logger
 from typing import Any
 
+import dask.dataframe as dd
 import joblib
 import mlflow
 import pandas as pd
-import dask.dataframe as dd
 from dask.distributed import wait
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from xgboost import XGBClassifier

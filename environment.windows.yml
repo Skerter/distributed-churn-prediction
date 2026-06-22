@@ -172,6 +172,7 @@ dependencies:
       - pygments==2.19.2
       - pykube-ng==23.6.0
       - pyparsing==3.3.2
+      - pytest==8.3.4
       - python-box==7.3.2
       - python-dateutil==2.9.0.post0
       - python-json-logger==4.0.0

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import shutil
+from logging import Logger
 from pathlib import Path
 from typing import Any
-from logging import Logger
 
 import dask
 import dask.dataframe as dd
@@ -14,7 +14,6 @@ from dask.distributed import wait
 from sklearn.model_selection import train_test_split
 
 from src.app.settings import Settings
-
 
 FEATURE_REQUIRED_COLUMNS = [
     "REVENUE",
@@ -392,7 +391,7 @@ def run_pandas_feature_engineering(settings: Settings, logger: Logger) -> dict[s
     else:
         logger.warning("Target encoding отключён конфигом")
         encoder_state = {}
-    
+
     _cleanup_output_path(train_processed_path)
     _cleanup_output_path(valid_processed_path)
     _cleanup_output_path(test_processed_path)
@@ -502,7 +501,7 @@ def _build_dask_numeric_fill_values(train_ddf: dd.DataFrame, strategy: str,
     if strategy not in {"mean", "median"}:
         raise ValueError(f"Неизвестная стратегия fillna_num={strategy}. "
                          "Поддерживаются только mean и median.")
-    
+
     tasks = dict()
     for column in numeric_columns:
         if strategy == "mean":
@@ -513,11 +512,11 @@ def _build_dask_numeric_fill_values(train_ddf: dd.DataFrame, strategy: str,
             # T-Digest аппроксимация достаточна для ML-препроцессинга.
             logger.debug("fillna_num=median: используется quantile(0.5) с T-Digest аппроксимацией")
             tasks[column] = train_ddf[column].quantile(0.5)
-            
+
     fill_values = dask.compute(tasks)[0]
     for column, value in fill_values.items():
         fill_values[column] = float(value)
-    
+
     logger.debug("Dask fill values рассчитаны: %s", fill_values)
     return fill_values
 
@@ -921,7 +920,7 @@ def run_dask_feature_engineering(settings: Settings, logger: Logger, client) -> 
     train_rows = _count_dask_rows(train_ddf)
     valid_rows = _count_dask_rows(valid_ddf)
     test_rows = _count_dask_rows(test_ddf)
-    
+
     logger.info(
         "Dask feature engineering завершён успешно: train_rows=%s, valid_rows=%s, test_rows=%s",
         train_rows,

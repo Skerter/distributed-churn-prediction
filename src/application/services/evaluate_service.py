@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from dask.distributed import wait
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
