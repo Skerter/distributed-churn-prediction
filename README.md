@@ -41,10 +41,12 @@ hamzaghanmi/expresso-churn-prediction-challenge
 |---|---|
 | CLI | Локальный запуск и отладка pipeline |
 | Web API | HTTP-интерфейс: health-check, конфигурация, модель, запуск pipeline через `run_id` |
-| [Frontend Dashboard](https://frontend-production-a2ef.up.railway.app/) | Статический веб-дашборд поверх Web API: запуск пайплайна, мониторинг, история, статистика |
-| [Telegram Bot](https://t.me/dcp_pipeline_bot) | Push-driven интерфейс для запуска и мониторинга pipeline из чата |
+| [Frontend Dashboard](https://dcp.135.106.161.48.nip.io/) | Статический веб-дашборд поверх Web API: запуск пайплайна, мониторинг, история, статистика |
+| Telegram Bot | Push-driven интерфейс для запуска и мониторинга pipeline из чата (на РФ-проде отключён — см. ниже) |
 
-> 🚀 **Live demo:** [frontend-production-a2ef.up.railway.app](https://frontend-production-a2ef.up.railway.app/) · бот в Telegram: [@dcp_pipeline_bot](https://t.me/dcp_pipeline_bot)
+> 🚀 **Live demo:** [dcp.135.106.161.48.nip.io](https://dcp.135.106.161.48.nip.io/) (Selectel VDS за общим Traefik) · API: [api.dcp.135.106.161.48.nip.io](https://api.dcp.135.106.161.48.nip.io/health) · MLflow UI: [mlflow.dcp.135.106.161.48.nip.io](https://mlflow.dcp.135.106.161.48.nip.io/)
+>
+> Бот в Telegram на текущем VDS **отключён**: с РФ-IP `api.telegram.org` недоступен (long-polling валится в таймаут). Демо живёт через дашборд + Web API.
 
 Дополнительно:
 
@@ -111,6 +113,10 @@ hamzaghanmi/expresso-churn-prediction-challenge
   - [Dockerfile](#dockerfile)
   - [GHCR](#ghcr)
   - [GitHub Actions](#github-actions)
+- [Live Demo на Selectel VDS](#live-demo-на-selectel-vds-docker-compose--traefik)
+  - [Состав стека](#состав-стека)
+  - [Развёртывание](#развёртывание)
+  - [Важные нюансы](#важные-нюансы-грабли-на-которые-уже-наступили)
 - [Kubernetes manifests и overlays](#kubernetes-manifests-и-overlays)
   - [Структура](#структура)
   - [Base](#base)
@@ -603,7 +609,7 @@ logs/pipeline_runs
 
 # Frontend Dashboard
 
-> 🌐 **Live:** [https://frontend-production-a2ef.up.railway.app/](https://frontend-production-a2ef.up.railway.app/)
+> 🌐 **Live:** [https://dcp.135.106.161.48.nip.io/](https://dcp.135.106.161.48.nip.io/) (Selectel VDS)
 
 `frontend/` — статический веб-дашборд для управления Web API из браузера. Чистый HTML/CSS/Vanilla JS, без сборщиков и npm-зависимостей.
 
@@ -645,6 +651,8 @@ http://localhost:3000
 # Telegram Bot
 
 > 💬 **Бот в Telegram:** [@dcp_pipeline_bot](https://t.me/dcp_pipeline_bot)
+>
+> ⚠️ На текущем РФ-VDS (Selectel) бот **отключён** (`profiles: ["bot"]` в `deploy/selectel/compose.yaml`): `api.telegram.org` недоступен с РФ-IP, long-polling валится в таймаут. Поднять, когда появится зарубежный прокси: `docker compose --profile bot up -d bot`.
 
 Telegram-бот — третий presentation layer над тем же core, что и CLI/Web API. Бот работает в режиме long-polling и общается с приложением через `AppContainer`:
 
@@ -1124,6 +1132,47 @@ pytest -q
 
 ---
 
+# Live Demo на Selectel VDS (docker compose + Traefik)
+
+Live-демо хостится на **Selectel VDS** рядом с другими проектами за общим reverse-proxy **Traefik** (маршрутизация по docker-labels `Host(...)` + Let's Encrypt). Оркестрация — **docker compose** (не k8s: для одного VDS с демо это оверинжиниринг). Конфиг — `deploy/selectel/`.
+
+> Railway-конфиги (`deploy/railway/`) — мертвы, оставлены как референс команд старта сервисов.
+
+## Состав стека
+
+| Сервис | Источник образа | Назначение | Домен |
+|---|---|---|---|
+| `backend` | GHCR (`:main`+) | Web API (FastAPI), pipeline in-process | `api.dcp.<IP>.nip.io` |
+| `frontend` | build на сервере | статический дашборд (nginx) | `dcp.<IP>.nip.io` |
+| `mlflow` | build на сервере | MLflow UI поверх Postgres | `mlflow.dcp.<IP>.nip.io` |
+| `db` | `postgres:16-alpine` | backend-store для MLflow | — (internal) |
+| `bot` | GHCR (тот же образ) | Telegram (за `profiles: ["bot"]`, **отключён**) | — |
+
+`backend` и `bot` — **один образ**, различаются только `command` (см. `deploy/railway/*.toml`). `frontend`/`mlflow` собираются на сервере (`build:`), в GHCR их нет — CI публикует только backend-образ.
+
+## Развёртывание
+
+```bash
+cd /opt/distributed-churn-prediction/deploy/selectel
+cp .env.example .env          # вписать IP в *_DOMAIN, POSTGRES_PASSWORD, (TELEGRAM_BOT_TOKEN)
+docker login ghcr.io          # backend-образ приватный (PAT classic, read:packages)
+docker compose up -d --build  # mlflow+frontend собираются, backend тянется из GHCR
+docker compose ps             # все Up; backend/bot НЕ Restarting
+```
+
+Проверка: `https://dcp.<IP>.nip.io/` → Health (зелёный) → Run Pipeline → `succeeded`. MLflow UI на `mlflow.dcp.<IP>.nip.io`.
+
+## Важные нюансы (грабли, на которые уже наступили)
+
+- **Тег образа обязан включать CORS.** Тег `v0.4.0` сделан до коммита add-CORS — backend из него не отдаёт `access-control-allow-origin`, фронт падает с `Failed to fetch` (хотя `/health` снаружи отвечает 200). Используй `:main` или новее. В `.env` — `IMAGE_TAG`.
+- **frontend запекает API-URL в `app.js` при старте** (`BACKEND_URL`) — это публичный `https://${API_DOMAIN}` (браузер ходит на API напрямую). CORS на API расширяется `ALLOWED_ORIGINS=https://${SITE_DOMAIN}`.
+- **Права на volumes:** named volumes создаются под root, контейнер — под mambauser → возможен `PermissionError /app/data/source` при старте. Лечится `chown` тома под UID образа.
+- **backend и bot — РАЗНЫЕ тома логов** (`dcp_logs` vs `dcp_bot_logs`): иначе рестарт одного через `_recover_stale_runs()` помечает FAILED активный run другого.
+- **⚠️ Общий compose-проект с соседними сервисами:** `docker compose down -v` и `--remove-orphans` в этой папке снесут чужие контейнеры/тома. Работать адресно (`up -d backend`, `restart backend`).
+- **Telegram-бот отключён** на РФ-VDS (`api.telegram.org` недоступен). Поднять с прокси: `docker compose --profile bot up -d bot`.
+
+---
+
 # Kubernetes manifests и overlays
 
 Проект использует Kustomize. Он встроен в `kubectl`, поэтому отдельная установка обычно не нужна.
@@ -1405,7 +1454,10 @@ distributed-churn-prediction/
 │   ├── dask_local.yaml
 │   └── dask_k8s.yaml
 ├── deploy/
-│   └── railway/             # Railway-конфиги по сервисам
+│   ├── selectel/            # Live Demo на Selectel VDS за общим Traefik (docker compose)
+│   │   ├── compose.yaml     # backend + frontend + mlflow + db (+ bot за profile)
+│   │   └── .env.example
+│   └── railway/             # Railway-конфиги (мертвы, оставлены как референс команд старта)
 │       ├── railway.bot.toml
 │       ├── railway.backend.toml
 │       └── railway.frontend.toml

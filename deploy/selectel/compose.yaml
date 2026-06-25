@@ -64,8 +64,15 @@ services:
 
   # ── Telegram-бот ───────────────────────────────────────────────────────────
   # Тот же образ, что backend. Long-polling, наружу не публикуется.
+  #
+  # ⚠️ ОТКЛЮЧЁН по умолчанию через `profiles`. На РФ-VDS api.telegram.org
+  # недоступен напрямую: бот стартует → `HTTP Client Request timeout` на polling
+  # → выходит → restart-цикл. Демо живёт через дашборд + Web API, бот не нужен.
+  # Поднять (когда появится зарубежный прокси для Telegram):
+  #   docker compose --profile bot up -d bot
   bot:
     image: ghcr.io/skerter/distributed-churn-prediction:${IMAGE_TAG:-latest}
+    profiles: ["bot"]
     restart: unless-stopped
     command: python -m src.presentation.bot.main --profile ${DCP_PROFILE:-pandas}
     env_file:
@@ -76,7 +83,10 @@ services:
     volumes:
       - dcp_models:/app/models
       - dcp_data:/app/data
-      - dcp_logs:/app/logs
+      # ОТДЕЛЬНЫЙ том логов: backend и bot оба запускают _recover_stale_runs()
+      # при старте — если бы стор runs (logs/pipeline_runs) был общим, рестарт
+      # бота помечал бы FAILED активный run, запущенный через backend.
+      - dcp_bot_logs:/app/logs
       - mlflow_artifacts:/mlflow-artifacts
     networks:
       - dcp_internal
@@ -126,7 +136,8 @@ volumes:
   mlflow_artifacts:
   dcp_models:
   dcp_data:
-  dcp_logs:
+  dcp_logs:       # стор runs backend (Web API)
+  dcp_bot_logs:   # отдельный стор runs бота — не пересекается с backend
 
 networks:
   proxy:
