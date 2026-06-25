@@ -1,0 +1,134 @@
+# ════════════════════════════════════════════════════════════════════════════
+# DCP Live Demo на Selectel VDS за общим Traefik.
+#
+# На сервере:
+#   cd deploy/selectel && cp .env.example .env
+#   docker compose up -d --build  # mlflow и frontend билдятся локально
+#
+# Traefik маршрутизирует по docker-labels на сеть `proxy`.
+# ════════════════════════════════════════════════════════════════════════════
+services:
+  # ── Web API (FastAPI) ──────────────────────────────────────────────────────
+  # Тот же образ, что и bot. Гоняет pipeline in-process. Браузер ходит на него
+  # напрямую → нужен публичный https-хост (${API_DOMAIN}).
+  backend:
+    image: ghcr.io/skerter/distributed-churn-prediction:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: bash /app/start-web.sh
+    env_file:
+      - .env
+    environment:
+      PORT: "8000"
+      DCP_PROFILE: "${DCP_PROFILE:-pandas}"
+      ALLOWED_ORIGINS: "https://${SITE_DOMAIN}"
+      # MLflow-клиент читает это env сам (в коде set_tracking_uri нет).
+      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+    volumes:
+      - dcp_models:/app/models
+      - dcp_data:/app/data
+      - dcp_logs:/app/logs
+      - mlflow_artifacts:/mlflow-artifacts
+    networks:
+      - proxy
+      - dcp_internal
+    depends_on:
+      - mlflow
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.dcp-api.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.dcp-api.entrypoints=websecure"
+      - "traefik.http.routers.dcp-api.tls.certresolver=le"
+      - "traefik.http.services.dcp-api.loadbalancer.server.port=8000"
+
+  # ── Frontend (статический дашборд на nginx) ────────────────────────────────
+  frontend:
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "80"
+      BACKEND_URL: "https://${API_DOMAIN}"
+    networks:
+      - proxy
+    depends_on:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.dcp-front.rule=Host(`${SITE_DOMAIN}`)"
+      - "traefik.http.routers.dcp-front.entrypoints=websecure"
+      - "traefik.http.routers.dcp-front.tls.certresolver=le"
+      - "traefik.http.services.dcp-front.loadbalancer.server.port=80"
+
+  # ── Telegram-бот ───────────────────────────────────────────────────────────
+  # Тот же образ, что backend. Long-polling, наружу не публикуется.
+  bot:
+    image: ghcr.io/skerter/distributed-churn-prediction:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: python -m src.presentation.bot.main --profile ${DCP_PROFILE:-pandas}
+    env_file:
+      - .env
+    environment:
+      DCP_PROFILE: "${DCP_PROFILE:-pandas}"
+      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+    volumes:
+      - dcp_models:/app/models
+      - dcp_data:/app/data
+      - dcp_logs:/app/logs
+      - mlflow_artifacts:/mlflow-artifacts
+    networks:
+      - dcp_internal
+    depends_on:
+      - mlflow
+
+  # ── MLflow UI (поверх Postgres) ────────────────────────────────────────────
+  # build из mlflow/Dockerfile. artifact-root — общий volume с backend/bot,
+  # иначе UI не увидит залогированные клиентом артефакты.
+  mlflow:
+    build:
+      context: ../..
+      dockerfile: mlflow/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+    volumes:
+      - mlflow_artifacts:/mlflow-artifacts
+    networks:
+      - proxy
+      - dcp_internal
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.dcp-mlflow.rule=Host(`${MLFLOW_DOMAIN}`)"
+      - "traefik.http.routers.dcp-mlflow.entrypoints=websecure"
+      - "traefik.http.routers.dcp-mlflow.tls.certresolver=le"
+      - "traefik.http.services.dcp-mlflow.loadbalancer.server.port=5000"
+
+  # ── Postgres (backend-store для MLflow) ────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - dcp_internal
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
+  dcp_models:
+  dcp_data:
+  dcp_logs:
+
+networks:
+  proxy:
+    external: true
+  dcp_internal:
