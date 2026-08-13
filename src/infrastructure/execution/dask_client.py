@@ -32,16 +32,21 @@ def create_dask_client(settings: Settings, logger) -> Any | None:
         raise ConfigError("Для Dask-режимов не установлен пакет dask.distributed") from exc
 
     if mode == RuntimeMode.DASK_LOCAL:
-        logger.info("Поднимается локальный Dask cluster: workers=%s threads_per_worker=%s",
-                    settings.dask.n_workers, settings.dask.threads_per_worker)
-        cluster = LocalCluster(n_workers=settings.dask.n_workers, threads_per_worker=settings.dask.threads_per_worker)
+        logger.info(
+            "Поднимается локальный Dask cluster: workers=%s threads_per_worker=%s",
+            settings.dask.n_workers,
+            settings.dask.threads_per_worker,
+        )
+        cluster = LocalCluster(
+            n_workers=settings.dask.n_workers, threads_per_worker=settings.dask.threads_per_worker
+        )
         return Client(cluster)
 
     if mode == RuntimeMode.DASK_K8S:
         if not settings.dask.scheduler_address:
             raise ConfigError("Для режима dask_k8s необходимо указать dask.scheduler_address")
 
-        logger.info("Подключение к внешнему Dask scheduler: %s",settings.dask.scheduler_address)
+        logger.info("Подключение к внешнему Dask scheduler: %s", settings.dask.scheduler_address)
         return Client(settings.dask.scheduler_address)
 
     raise ConfigError(f"Не удалось создать Dask client для режима {mode.value}")

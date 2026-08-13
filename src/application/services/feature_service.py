@@ -43,7 +43,9 @@ def _validate_columns(df: pd.DataFrame, required_columns: list[str], frame_name:
         raise ValueError(f"В {frame_name} отсутствуют обязательные колонки: {missing}")
 
 
-def _build_numeric_fill_values(train_df: pd.DataFrame, strategy: str, target_column: str) -> dict[str, float]:
+def _build_numeric_fill_values(
+    train_df: pd.DataFrame, strategy: str, target_column: str
+) -> dict[str, float]:
     """Строит значения для заполнения пропусков в числовых колонках.
 
     Args:
@@ -68,13 +70,17 @@ def _build_numeric_fill_values(train_df: pd.DataFrame, strategy: str, target_col
         elif strategy == "mean":
             fill_values[column] = float(train_df[column].mean())
         else:
-            raise ValueError(f"Неизвестная стратегия fillna_num={strategy}. "
-                             "Поддерживаются только mean и median.")
+            raise ValueError(
+                f"Неизвестная стратегия fillna_num={strategy}. "
+                "Поддерживаются только mean и median."
+            )
 
     return fill_values
 
 
-def _fill_numeric_na(df: pd.DataFrame, fill_values: dict[str, float], logger, frame_name: str) -> pd.DataFrame:
+def _fill_numeric_na(
+    df: pd.DataFrame, fill_values: dict[str, float], logger, frame_name: str
+) -> pd.DataFrame:
     """Заполняет пропуски в числовых колонках DataFrame.
 
     Args:
@@ -94,15 +100,21 @@ def _fill_numeric_na(df: pd.DataFrame, fill_values: dict[str, float], logger, fr
 
         na_count = int(result[column].isna().sum())
         if na_count > 0:
-            logger.debug("%s: числовой признак %s, заполняем %s пропусков значением %.6f",
-                         frame_name, column, na_count, fill_value)
+            logger.debug(
+                "%s: числовой признак %s, заполняем %s пропусков значением %.6f",
+                frame_name,
+                column,
+                na_count,
+                fill_value,
+            )
             result[column] = result[column].fillna(fill_value)
 
     return result
 
 
-def _fill_categorical_na(df: pd.DataFrame, categorical_columns: list[str],
-                         fill_value: str, logger, frame_name: str) -> pd.DataFrame:
+def _fill_categorical_na(
+    df: pd.DataFrame, categorical_columns: list[str], fill_value: str, logger, frame_name: str
+) -> pd.DataFrame:
     """Заполняет пропуски в категориальных колонках DataFrame.
 
     Args:
@@ -120,8 +132,13 @@ def _fill_categorical_na(df: pd.DataFrame, categorical_columns: list[str],
     for column in categorical_columns:
         na_count = int(result[column].isna().sum())
         if na_count > 0:
-            logger.debug("%s: категориальный признак %s, заполняем %s пропусков значением %s",
-                         frame_name, column, na_count, fill_value)
+            logger.debug(
+                "%s: категориальный признак %s, заполняем %s пропусков значением %s",
+                frame_name,
+                column,
+                na_count,
+                fill_value,
+            )
         result[column] = result[column].fillna(fill_value)
 
     return result
@@ -184,36 +201,24 @@ def _target_encode(
 
         stats = train_result.groupby(column)[target_column].agg(["mean", "count"])
 
-        smoothed = (
-            stats["count"] * stats["mean"] + smoothing * prior
-        ) / (stats["count"] + smoothing)
+        smoothed = (stats["count"] * stats["mean"] + smoothing * prior) / (
+            stats["count"] + smoothing
+        )
 
         runtime_mapping = smoothed.to_dict()
 
-        mappings[column] = {
-            str(key): float(value)
-            for key, value in runtime_mapping.items()
-        }
+        mappings[column] = {str(key): float(value) for key, value in runtime_mapping.items()}
 
         train_result[column] = (
-            train_result[column]
-            .map(runtime_mapping)
-            .fillna(prior)
-            .astype("float64")
+            train_result[column].map(runtime_mapping).fillna(prior).astype("float64")
         )
 
         valid_result[column] = (
-            valid_result[column]
-            .map(runtime_mapping)
-            .fillna(prior)
-            .astype("float64")
+            valid_result[column].map(runtime_mapping).fillna(prior).astype("float64")
         )
 
         test_result[column] = (
-            test_result[column]
-            .map(runtime_mapping)
-            .fillna(prior)
-            .astype("float64")
+            test_result[column].map(runtime_mapping).fillna(prior).astype("float64")
         )
 
         logger.debug(
@@ -434,7 +439,9 @@ def run_pandas_feature_engineering(settings: Settings, logger: Logger) -> dict[s
     }
 
 
-def _validate_columns_by_names(columns: list[str], required_columns: list[str], frame_name: str) -> None:
+def _validate_columns_by_names(
+    columns: list[str], required_columns: list[str], frame_name: str
+) -> None:
     """Проверяет наличие обязательных колонок в Dask DataFrame по списку имён.
 
     Args:
@@ -478,8 +485,9 @@ def _count_dask_rows(ddf: dd.DataFrame) -> int:
     return int(ddf.map_partitions(len).sum().compute())
 
 
-def _build_dask_numeric_fill_values(train_ddf: dd.DataFrame, strategy: str,
-                                    target_column: str, logger: Logger) -> dict[str, float]:
+def _build_dask_numeric_fill_values(
+    train_ddf: dd.DataFrame, strategy: str, target_column: str, logger: Logger
+) -> dict[str, float]:
     """Строит значения для заполнения пропусков в числовых колонках Dask DataFrame.
 
     Args:
@@ -495,12 +503,16 @@ def _build_dask_numeric_fill_values(train_ddf: dd.DataFrame, strategy: str,
     Returns:
         dict[str, float]: Словарь вида {column_name: fill_value}.
     """
-    numeric_columns = [column for column, dtype in train_ddf.dtypes.items()
-                       if pd.api.types.is_numeric_dtype(dtype) and column != target_column]
+    numeric_columns = [
+        column
+        for column, dtype in train_ddf.dtypes.items()
+        if pd.api.types.is_numeric_dtype(dtype) and column != target_column
+    ]
 
     if strategy not in {"mean", "median"}:
-        raise ValueError(f"Неизвестная стратегия fillna_num={strategy}. "
-                         "Поддерживаются только mean и median.")
+        raise ValueError(
+            f"Неизвестная стратегия fillna_num={strategy}. " "Поддерживаются только mean и median."
+        )
 
     tasks = dict()
     for column in numeric_columns:
@@ -521,8 +533,9 @@ def _build_dask_numeric_fill_values(train_ddf: dd.DataFrame, strategy: str,
     return fill_values
 
 
-def _fill_dask_numeric_na(ddf: dd.DataFrame, fill_values: dict[str, float],
-                          logger: Logger, frame_name: str) -> dd.DataFrame:
+def _fill_dask_numeric_na(
+    ddf: dd.DataFrame, fill_values: dict[str, float], logger: Logger, frame_name: str
+) -> dd.DataFrame:
     """Заполняет пропуски в числовых колонках Dask DataFrame.
 
     Args:
@@ -540,15 +553,21 @@ def _fill_dask_numeric_na(ddf: dd.DataFrame, fill_values: dict[str, float],
         if column not in result.columns:
             continue
 
-        logger.debug("%s: числовой признак %s будет заполнен значением %.6f",
-                     frame_name, column, fill_value)
+        logger.debug(
+            "%s: числовой признак %s будет заполнен значением %.6f", frame_name, column, fill_value
+        )
         result[column] = result[column].fillna(fill_value)
 
     return result
 
 
-def _fill_dask_categorical_na(ddf: dd.DataFrame, categorical_columns: list[str],
-                              fill_value: str, logger: Logger, frame_name: str) -> dd.DataFrame:
+def _fill_dask_categorical_na(
+    ddf: dd.DataFrame,
+    categorical_columns: list[str],
+    fill_value: str,
+    logger: Logger,
+    frame_name: str,
+) -> dd.DataFrame:
     """Заполняет пропуски в категориальных колонках Dask DataFrame.
 
     Args:
@@ -564,8 +583,12 @@ def _fill_dask_categorical_na(ddf: dd.DataFrame, categorical_columns: list[str],
     result = ddf
 
     for column in categorical_columns:
-        logger.debug("%s: категориальный признак %s будет заполнен значением %s",
-                     frame_name, column, fill_value)
+        logger.debug(
+            "%s: категориальный признак %s будет заполнен значением %s",
+            frame_name,
+            column,
+            fill_value,
+        )
         result[column] = result[column].fillna(fill_value)
 
     return result
@@ -583,7 +606,7 @@ def _create_dask_features(ddf: dd.DataFrame) -> dd.DataFrame:
     result = ddf.copy()
 
     result["AVG_REVENUE"] = result["REVENUE"] / (result["FREQUENCE"] + 1)
-    result["RECH_TO_DATA_RATIO"] = (result["FREQUENCE_RECH"] / (result["DATA_VOLUME"] + 1))
+    result["RECH_TO_DATA_RATIO"] = result["FREQUENCE_RECH"] / (result["DATA_VOLUME"] + 1)
     result["REGULARITY_SCORE"] = result["REGULARITY"] / 90.0
     result["HAS_TOP_PACK"] = (result["TOP_PACK"] != "missing").astype("int8")
     result["MISSING_ZONE"] = (result["ZONE1"].isna() & result["ZONE2"].isna()).astype("int8")
@@ -599,13 +622,13 @@ def _split_dask_train_valid_by_target(
     logger: Logger,
 ) -> tuple[dd.DataFrame, dd.DataFrame]:
     """Делит Dask DataFrame на train/validation до preprocessing.
-    
+
     Dask DataFrame не имеет полного аналога sklearn train_test_split(..., stratify=...),
     поэтому здесь используется class-wise split:
     1. отдельно берём строки каждого класса target;
     2. отдельно делим каждый класс через random_split;
     3. собираем train и validation обратно через dd.concat.
-    
+
     Args:
         ddf (dd.DataFrame): Входной Dask DataFrame.
         target_column (str): Название целевой колонки для стратификации.
@@ -613,7 +636,7 @@ def _split_dask_train_valid_by_target(
         random_state (int): Фиксированное значение для генератора случайных чисел
             для воспроизводимости.
         logger (Logger): Логгер для диагностических сообщений.
-    
+
     Returns:
         tuple[dd.DataFrame, dd.DataFrame]: Кортеж из train и validation Dask DataFrame.
     """
@@ -695,16 +718,13 @@ def _target_encode_dask(
 
         stats = train_result.groupby(column)[target_column].agg(["mean", "count"]).compute()
 
-        smoothed = (
-            stats["count"] * stats["mean"] + smoothing * prior
-        ) / (stats["count"] + smoothing)
+        smoothed = (stats["count"] * stats["mean"] + smoothing * prior) / (
+            stats["count"] + smoothing
+        )
 
         runtime_mapping = smoothed.to_dict()
 
-        mappings[column] = {
-            str(key): float(value)
-            for key, value in runtime_mapping.items()
-        }
+        mappings[column] = {str(key): float(value) for key, value in runtime_mapping.items()}
 
         train_result[column] = train_result[column].map_partitions(
             lambda series, mapping=runtime_mapping, default_value=prior: (

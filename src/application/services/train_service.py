@@ -247,9 +247,7 @@ def train_pandas_model(settings: Settings, logger: Logger) -> dict[str, object]:
 
     if not train_processed_path.exists():
         logger.error("Не найден train parquet для обучения: %s", train_processed_path)
-        raise FileNotFoundError(
-            f"Не найден train parquet для обучения: {train_processed_path}"
-        )
+        raise FileNotFoundError(f"Не найден train parquet для обучения: {train_processed_path}")
 
     if not valid_processed_path.exists():
         logger.error("Не найден valid parquet для early stopping: %s", valid_processed_path)
@@ -301,12 +299,14 @@ def train_pandas_model(settings: Settings, logger: Logger) -> dict[str, object]:
             mlflow.log_param("model_name", settings.model.name)
             mlflow.log_param("model_version", settings.model.version)
             mlflow.log_params(_build_xgb_common_params(settings))
-            mlflow.log_metrics({
-                "train_rows": X_train.shape[0],
-                "val_rows": X_val.shape[0],
-                "train_target_rate": float(y_train.mean()),
-                "val_target_rate": float(y_val.mean()),
-            })
+            mlflow.log_metrics(
+                {
+                    "train_rows": X_train.shape[0],
+                    "val_rows": X_val.shape[0],
+                    "train_target_rate": float(y_train.mean()),
+                    "val_target_rate": float(y_val.mean()),
+                }
+            )
             if best_iteration is not None:
                 mlflow.log_metric("best_iteration", float(best_iteration))
     except Exception as exc:
@@ -371,9 +371,7 @@ def train_dask_model(
 
     if not train_processed_path.exists():
         logger.error("Не найден train parquet для обучения: %s", train_processed_path)
-        raise FileNotFoundError(
-            f"Не найден train parquet для обучения: {train_processed_path}"
-        )
+        raise FileNotFoundError(f"Не найден train parquet для обучения: {train_processed_path}")
 
     if not valid_processed_path.exists():
         logger.error("Не найден valid parquet для early stopping: %s", valid_processed_path)
@@ -464,12 +462,14 @@ def train_dask_model(
             mlflow.log_param("model_name", settings.model.name)
             mlflow.log_param("model_version", settings.model.version)
             mlflow.log_params(_build_xgb_common_params(settings))
-            mlflow.log_metrics({
-                "train_rows": train_rows,
-                "val_rows": val_rows,
-                "train_target_rate": train_target_rate or 0.0,
-                "val_target_rate": val_target_rate or 0.0,
-            })
+            mlflow.log_metrics(
+                {
+                    "train_rows": train_rows,
+                    "val_rows": val_rows,
+                    "train_target_rate": train_target_rate or 0.0,
+                    "val_target_rate": val_target_rate or 0.0,
+                }
+            )
             if best_iteration is not None:
                 mlflow.log_metric("best_iteration", float(best_iteration))
     except Exception as exc:

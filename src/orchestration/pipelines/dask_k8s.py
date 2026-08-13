@@ -40,9 +40,7 @@ class DaskK8sPipeline(BasePipeline):
         # Здесь мы только проверяем, что подключение действительно передано
         # в pipeline и может использоваться Dask-сервисами.
         if self.client is None:
-            self.logger.error(
-                "DaskK8sPipeline ожидает внешний Dask client, но client=None"
-            )
+            self.logger.error("DaskK8sPipeline ожидает внешний Dask client, но client=None")
             raise RuntimeError("DaskK8sPipeline не может работать без Dask client")
 
         self.logger.info("Dask client успешно передан в Kubernetes pipeline")
@@ -123,7 +121,7 @@ class DaskK8sPipeline(BasePipeline):
 
     def _validate_runtime_config(self, scheduler_address: str | None) -> None:
         """Проверяет runtime-конфигурацию Kubernetes-пайплайна.
-        
+
         Args:
             scheduler_address (str | None): Адрес Dask scheduler из конфига.
         Raises:
@@ -138,8 +136,7 @@ class DaskK8sPipeline(BasePipeline):
                 runtime_mode,
             )
             raise RuntimeError(
-                "DaskK8sPipeline ожидает runtime.mode='dask_k8s', "
-                f"но получено '{runtime_mode}'"
+                "DaskK8sPipeline ожидает runtime.mode='dask_k8s', " f"но получено '{runtime_mode}'"
             )
 
         if not scheduler_address:

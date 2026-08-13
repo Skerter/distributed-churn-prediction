@@ -48,11 +48,17 @@ class DaskLocalPipeline(BasePipeline):
         except Exception as exc:
             self.logger.warning("Не удалось получить dashboard_link: %s", exc)
 
-        if self.run_options["skip_features"] and (not self.run_options["skip_train"] or not self.run_options["skip_eval"]):
-            self.logger.warning("Пропущен шаг features. Ожидается, что parquet-артефакты уже существуют.")
+        if self.run_options["skip_features"] and (
+            not self.run_options["skip_train"] or not self.run_options["skip_eval"]
+        ):
+            self.logger.warning(
+                "Пропущен шаг features. Ожидается, что parquet-артефакты уже существуют."
+            )
 
         if self.run_options["skip_train"] and not self.run_options["skip_eval"]:
-            self.logger.warning("Пропущен шаг train. Ожидается, что обученная модель уже существует.")
+            self.logger.warning(
+                "Пропущен шаг train. Ожидается, что обученная модель уже существует."
+            )
 
         executed_steps = []
         skipped_steps = []
@@ -67,17 +73,26 @@ class DaskLocalPipeline(BasePipeline):
         self.logger.info("Проверка конфигурации пайпайна")
 
         if self.config.runtime.mode.value != "dask_local":
-            self.logger.warning("DaskLocalPipeline ожидает runtime.mode='dask_local', но получено %s", self.config.runtime.mode.value)
-            raise RuntimeError(f"DaskLocalPipeline ожидает runtime.mode='dask_local', но получено '{self.config.runtime.mode.value}'")
+            self.logger.warning(
+                "DaskLocalPipeline ожидает runtime.mode='dask_local', но получено %s",
+                self.config.runtime.mode.value,
+            )
+            raise RuntimeError(
+                f"DaskLocalPipeline ожидает runtime.mode='dask_local', но получено '{self.config.runtime.mode.value}'"
+            )
 
         if not self.config.dask.n_workers or not self.config.dask.threads_per_worker:
-            self.logger.warning("DaskLocalPipeline запущен с неполной Dask-конфигурацией: n_workers=%s, threads_per_worker=%s",
-                                self.config.dask.n_workers, self.config.dask.threads_per_worker)
-            raise RuntimeError("DaskLocalPipeline требует указания n_workers и threads_per_worker в конфигурации dask")
+            self.logger.warning(
+                "DaskLocalPipeline запущен с неполной Dask-конфигурацией: n_workers=%s, threads_per_worker=%s",
+                self.config.dask.n_workers,
+                self.config.dask.threads_per_worker,
+            )
+            raise RuntimeError(
+                "DaskLocalPipeline требует указания n_workers и threads_per_worker в конфигурации dask"
+            )
 
         self.logger.debug("n_workers=%s", self.config.dask.n_workers)
         self.logger.debug("threads_per_worker=%s", self.config.dask.threads_per_worker)
-
 
         if self.run_options["skip_load"]:
             self.logger.warning("Пропущен шаг load.")
@@ -90,19 +105,19 @@ class DaskLocalPipeline(BasePipeline):
             )
             executed_steps.append("load")
 
-        if self.run_options['skip_features']:
+        if self.run_options["skip_features"]:
             self.logger.warning("Шаг features пропущен")
             skipped_steps.append("features")
         else:
             self.logger.info("Шаг 2/4: feature engineering")
-            artifacts['features'] = run_dask_feature_engineering(
+            artifacts["features"] = run_dask_feature_engineering(
                 settings=self.config,
                 logger=self.logger.getChild("features"),
                 client=self.client,
             )
             executed_steps.append("features")
 
-        if self.run_options['skip_train']:
+        if self.run_options["skip_train"]:
             self.logger.warning("Шаг train пропущен")
             skipped_steps.append("train")
         else:
@@ -114,7 +129,7 @@ class DaskLocalPipeline(BasePipeline):
             )
             executed_steps.append("train")
 
-        if self.run_options['skip_eval']:
+        if self.run_options["skip_eval"]:
             self.logger.warning("Шаг eval пропущен")
             skipped_steps.append("eval")
         else:

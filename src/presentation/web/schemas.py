@@ -15,9 +15,7 @@ class HealthApiResponse(BaseModel):
 class RunPipelineApiRequest(BaseModel):
     execute: bool = Field(
         default=False,
-        description=(
-            "Если false — dry-run. Если true — реальный запуск pipeline."
-        ),
+        description=("Если false — dry-run. Если true — реальный запуск pipeline."),
     )
     skip_load: bool = False
     skip_features: bool = False

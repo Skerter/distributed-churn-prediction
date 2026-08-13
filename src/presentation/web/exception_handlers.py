@@ -29,7 +29,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     """Регистрирует единый формат ошибок для Web API.
     Args:
         app: FastAPI-приложение, для которого регистрируются обработчики ошибок.
-"""
+    """
 
     @app.exception_handler(ChurnAppError)
     async def churn_app_error_handler(
@@ -53,7 +53,6 @@ def register_exception_handlers(app: FastAPI) -> None:
             message=str(exc),
         )
 
-
     @app.exception_handler(FileNotFoundError)
     async def file_not_found_handler(
         request: Request,
@@ -64,7 +63,6 @@ def register_exception_handlers(app: FastAPI) -> None:
             code="NOT_FOUND",
             message=str(exc),
         )
-
 
     @app.exception_handler(Exception)
     async def unexpected_error_handler(

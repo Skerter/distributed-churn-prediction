@@ -48,7 +48,7 @@ def _load_metrics_if_exists(path: Path) -> dict[str, Any] | None:
 
 def get_model_info(container: AppContainer, profile: str) -> ModelInfoResponse:
     """Возвращает информацию об ожидаемой модели и связанных артефактах.
-    
+
     Args:
         container (AppContainer): Контейнер приложения, содержащий настройки и зависимости.
         profile (str): Имя профиля, для которого запрашивается информация о модели.

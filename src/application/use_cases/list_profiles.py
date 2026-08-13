@@ -20,8 +20,7 @@ def list_profiles() -> ProfilesResponse:
             runtime_mode=RuntimeMode.DASK_LOCAL.value,
             web_enabled=True,
             description=(
-                "Локальный Dask-режим. Поднимает LocalCluster на машине, "
-                "где запущен сервер."
+                "Локальный Dask-режим. Поднимает LocalCluster на машине, " "где запущен сервер."
             ),
         ),
         ProfileInfo(

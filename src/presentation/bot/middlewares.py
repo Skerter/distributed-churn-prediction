@@ -87,9 +87,7 @@ class AuthMiddleware(BaseMiddleware):
             user_id = event.from_user.id
 
         if user_id is not None and user_id not in self._allowed:
-            self._logger.warning(
-                "Несанкционированный доступ: user_id=%s", user_id
-            )
+            self._logger.warning("Несанкционированный доступ: user_id=%s", user_id)
             if isinstance(event, Message):
                 await event.answer(MSG_UNAUTHORIZED)
             elif isinstance(event, CallbackQuery):

@@ -9,6 +9,7 @@ class HealthResponse:
     Returns:
         HealthResponse: Экземпляр класса HealthResponse, содержащий информацию о состоянии здоровья приложения.
     """
+
     app_name: str
     app_version: str
     profile_mode: str
@@ -30,6 +31,7 @@ class RunPipelineResponse:
     Returns:
         RunPipelineResponse: Экземпляр класса RunPipelineResponse, содержащий информацию о результате выполнения pipeline.
     """
+
     success: bool
     profile: str
     mode: str
@@ -102,6 +104,7 @@ class ConfigSummaryResponse:
             "api": self.api,
             "paths": self.paths,
         }
+
 
 @dataclass(slots=True)
 class ModelInfoResponse:

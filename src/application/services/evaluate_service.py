@@ -157,9 +157,7 @@ def evaluate_pandas_model(settings: Settings, logger: Logger) -> dict[str, Any]:
 
     if not valid_processed_path.exists():
         logger.error("Не найден valid parquet для оценки: %s", valid_processed_path)
-        raise FileNotFoundError(
-            f"Не найден valid parquet для оценки: {valid_processed_path}"
-        )
+        raise FileNotFoundError(f"Не найден valid parquet для оценки: {valid_processed_path}")
 
     if not model_path.exists():
         logger.error("Не найдена модель для оценки: %s", model_path)
@@ -168,7 +166,9 @@ def evaluate_pandas_model(settings: Settings, logger: Logger) -> dict[str, Any]:
     eval_plots_dir = settings.notebooks_dir / "eval_plots"
     eval_plots_dir.mkdir(parents=True, exist_ok=True)
 
-    metrics_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}_eval_metrics.json"
+    metrics_path = (
+        settings.models_dir / f"{settings.model.name}_{settings.model.version}_eval_metrics.json"
+    )
     confusion_matrix_path = eval_plots_dir / "confusion_matrix.png"
     roc_curve_path = eval_plots_dir / "roc_curve.png"
     pr_curve_path = eval_plots_dir / "pr_curve.png"
@@ -285,9 +285,7 @@ def evaluate_dask_model(
 
     if not valid_processed_path.exists():
         logger.error("Не найден valid parquet для оценки: %s", valid_processed_path)
-        raise FileNotFoundError(
-            f"Не найден valid parquet для оценки: {valid_processed_path}"
-        )
+        raise FileNotFoundError(f"Не найден valid parquet для оценки: {valid_processed_path}")
 
     if not model_path.exists():
         logger.error("Не найдена модель для оценки: %s", model_path)
@@ -296,7 +294,9 @@ def evaluate_dask_model(
     eval_plots_dir = settings.notebooks_dir / "eval_plots"
     eval_plots_dir.mkdir(parents=True, exist_ok=True)
 
-    metrics_path = settings.models_dir / f"{settings.model.name}_{settings.model.version}_eval_metrics.json"
+    metrics_path = (
+        settings.models_dir / f"{settings.model.name}_{settings.model.version}_eval_metrics.json"
+    )
     confusion_matrix_path = eval_plots_dir / "confusion_matrix.png"
     roc_curve_path = eval_plots_dir / "roc_curve.png"
     pr_curve_path = eval_plots_dir / "pr_curve.png"

@@ -20,6 +20,7 @@ class AppContainer:
     Returns:
         Any: Экземпляр класса pipeline, соответствующий текущему режиму выполнения.
     """
+
     settings: Settings
     logger: logging.Logger
     dask_client: Any | None

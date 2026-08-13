@@ -90,10 +90,7 @@ def create_app() -> FastAPI:
 
     web_app = FastAPI(
         title="Distributed Churn Prediction Backend API",
-        description=(
-            "HTTP-адаптер над application layer проекта "
-            "distributed-churn-prediction."
-        ),
+        description=("HTTP-адаптер над application layer проекта " "distributed-churn-prediction."),
         version="0.4.0",
         lifespan=lifespan,
     )

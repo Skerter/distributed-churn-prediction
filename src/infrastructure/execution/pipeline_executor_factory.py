@@ -43,9 +43,7 @@ def build_pipeline_executor(
             max_concurrent_runs=settings.api.max_concurrent_pipeline_runs,
         )
 
-    raise RuntimeError(
-        f"Неизвестный pipeline executor: {settings.api.pipeline_executor.value}"
-    )
+    raise RuntimeError(f"Неизвестный pipeline executor: {settings.api.pipeline_executor.value}")
 
 
 def build_bot_pipeline_executor(

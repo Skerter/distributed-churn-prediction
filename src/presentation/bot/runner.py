@@ -3,6 +3,7 @@
 Не содержит логики запуска пайплайна — только ожидание завершения треда
 и отправка уведомлений пользователю.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -45,7 +46,9 @@ async def watch_and_notify(
         on_done: Callback для освобождения ресурсов (executor.cleanup).
     """
     loop = asyncio.get_running_loop()
-    logger.debug("watch_and_notify: начало мониторинга run_id=%s timeout=%ds", run_id, timeout_seconds)
+    logger.debug(
+        "watch_and_notify: начало мониторинга run_id=%s timeout=%ds", run_id, timeout_seconds
+    )
 
     try:
         await asyncio.wait_for(
@@ -55,9 +58,7 @@ async def watch_and_notify(
     except TimeoutError:
         cancel_event.set()
         run_store.mark_failed(run_id, error=f"Таймаут: превышен лимит {timeout_seconds}s")
-        logger.warning(
-            "watch_and_notify: pipeline run прерван по таймауту run_id=%s", run_id
-        )
+        logger.warning("watch_and_notify: pipeline run прерван по таймауту run_id=%s", run_id)
         on_done(run_id)
         await bot.send_message(
             chat_id,
@@ -78,7 +79,9 @@ async def watch_and_notify(
     logger.debug("watch_and_notify: тред завершён run_id=%s", run_id)
 
     if cancel_event.is_set():
-        logger.info("watch_and_notify: run %s отменён пользователем — уведомление пропущено", run_id)
+        logger.info(
+            "watch_and_notify: run %s отменён пользователем — уведомление пропущено", run_id
+        )
         return
 
     try:
@@ -104,9 +107,7 @@ async def watch_and_notify(
         )
     else:
         error = payload.get("error") or "неизвестная ошибка"
-        logger.info(
-            "watch_and_notify: pipeline failed run_id=%s error=%s", run_id, error
-        )
+        logger.info("watch_and_notify: pipeline failed run_id=%s error=%s", run_id, error)
         await bot.send_message(
             chat_id,
             MSG_PIPELINE_FAILED.format(run_id=run_id, error=error),

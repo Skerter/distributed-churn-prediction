@@ -22,7 +22,9 @@ def _find_file(root: Path, filename: str) -> Path:
     """
     matches = sorted(root.rglob(filename))
     if not matches:
-        raise FileNotFoundError(f"Файл {filename} не найден в директории скачанного датасета {root}")
+        raise FileNotFoundError(
+            f"Файл {filename} не найден в директории скачанного датасета {root}"
+        )
     return matches[0]
 
 
@@ -71,7 +73,7 @@ def ensure_source_dataset(settings: Settings, logger) -> dict[str, Any]:
         logger.exception("Не удалось импортировать kagglehub")
         raise RuntimeError("Для автозагрузки датасета требуется установленный kagglehub") from exc
 
-    logger.info("Пробуем скачать/взять из кеша датасет KaggleHub: %s",settings.data.dataset_slug)
+    logger.info("Пробуем скачать/взять из кеша датасет KaggleHub: %s", settings.data.dataset_slug)
     downloaded_root = Path(kagglehub.dataset_download(settings.data.dataset_slug))
     logger.info("KaggleHub вернул директорию: %s", downloaded_root)
 

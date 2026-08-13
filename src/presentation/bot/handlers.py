@@ -167,9 +167,7 @@ async def cb_run_pipeline(
         if "активный pipeline run" in str(exc):
             await callback.message.answer(MSG_PIPELINE_BUSY)
         else:
-            logger.error(
-                "Не удалось запустить pipeline: profile=%s error=%s", profile, exc
-            )
+            logger.error("Не удалось запустить pipeline: profile=%s error=%s", profile, exc)
             await callback.message.answer(MSG_PIPELINE_ERROR.format(error=exc))
         return
 

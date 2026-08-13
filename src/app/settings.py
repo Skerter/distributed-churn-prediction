@@ -124,6 +124,7 @@ class BotSettings:
     Raises:
         ConfigError: Если не удалось разрешить конфигурационные параметры.
     """
+
     admin_chat_ids: list[int]
     pipeline_timeout_seconds: int = 7200
 
@@ -139,6 +140,7 @@ class Settings:
     Returns:
         Settings: Экземпляр класса Settings, содержащий все инициализированные конфигурационные параметры.
     """
+
     project_root: Path
     app: AppMetaSettings
     paths: PathsSettings
@@ -282,9 +284,7 @@ class Settings:
         try:
             runtime_mode = RuntimeMode(runtime_data["mode"])
         except ValueError as exc:
-            raise ConfigError(
-                f"Недопустимый runtime.mode: {runtime_data.get('mode')}"
-            ) from exc
+            raise ConfigError(f"Недопустимый runtime.mode: {runtime_data.get('mode')}") from exc
 
         return cls(
             project_root=project_root,
@@ -350,12 +350,8 @@ class Settings:
                 top_fraction=float(evaluation_data.get("top_fraction", 0.1)),
             ),
             api=ApiSettings(
-                pipeline_executor=PipelineExecutorKind(
-                    api_data.get("pipeline_executor", "web")
-                ),
-                max_concurrent_pipeline_runs=int(
-                    api_data.get("max_concurrent_pipeline_runs", 1)
-                ),
+                pipeline_executor=PipelineExecutorKind(api_data.get("pipeline_executor", "web")),
+                max_concurrent_pipeline_runs=int(api_data.get("max_concurrent_pipeline_runs", 1)),
                 kubernetes=ApiKubernetesSettings(
                     namespace=kubernetes_data.get("namespace", "default"),
                     job_name_prefix=kubernetes_data.get("job_name_prefix", "dcp-pipeline"),

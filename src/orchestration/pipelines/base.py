@@ -12,7 +12,9 @@ class BasePipeline(ABC):
     Общая обвязка: логирование, замер времени, обработка ошибок — живёт здесь.
     """
 
-    def __init__(self, config, logger, client=None, run_options: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self, config, logger, client=None, run_options: dict[str, Any] | None = None
+    ) -> None:
         self.config = config
         self.logger = logger
         self.client = client
@@ -62,8 +64,9 @@ class BasePipeline(ABC):
             finished_at = datetime.now()
             duration = finished_at - started_at
 
-            self.logger.info("=== Pipeline %s завершён успешно за %s ===",
-                             self.pipeline_name, duration)
+            self.logger.info(
+                "=== Pipeline %s завершён успешно за %s ===", self.pipeline_name, duration
+            )
             self.logger.debug("Результат pipeline %s: %s", self.pipeline_name, result)
 
             return {
@@ -77,15 +80,19 @@ class BasePipeline(ABC):
             }
 
         except NotImplementedError:
-            self.logger.error("Pipeline %s не реализован: _run_impl() должен быть переопределён", self.pipeline_name)
+            self.logger.error(
+                "Pipeline %s не реализован: _run_impl() должен быть переопределён",
+                self.pipeline_name,
+            )
             raise
 
         except Exception as exc:
             finished_at = datetime.now()
             duration = finished_at - started_at
 
-            self.logger.exception("Pipeline %s завершился с ошибкой после %s: %s",
-                                  self.pipeline_name, duration, exc)
+            self.logger.exception(
+                "Pipeline %s завершился с ошибкой после %s: %s", self.pipeline_name, duration, exc
+            )
             raise
 
     @abstractmethod
