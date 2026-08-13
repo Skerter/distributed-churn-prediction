@@ -1,27 +1,29 @@
 # ════════════════════════════════════════════════════════════════════════════
-# DCP Live Demo на Selectel VDS за общим Traefik.
+# DCP Live Demo on Selectel VDS behind a shared Traefik.
 #
-# На сервере:
+# On the server:
 #   cd deploy/selectel && cp .env.example .env
-#   docker compose up -d --build  # mlflow и frontend билдятся локально
+#   docker compose up -d --build  # mlflow and frontend are built locally
 #
-# Traefik маршрутизирует по docker-labels на сеть `proxy`.
+# Traefik routes requests based on docker labels to the `proxy` network.
 # ════════════════════════════════════════════════════════════════════════════
 services:
   # ── Web API (FastAPI) ──────────────────────────────────────────────────────
-  # Тот же образ, что и bot. Гоняет pipeline in-process. Браузер ходит на него
-  # напрямую → нужен публичный https-хост (${API_DOMAIN}).
+  # The same image as the bot. Runs the pipeline in-process. The browser accesses it
+  # directly → requires a public https host (${API_DOMAIN}).
   backend:
     image: ghcr.io/skerter/distributed-churn-prediction:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    command: bash /app/start-web.sh
+    command: python -m uvicorn src.presentation.web.app:app --host 0.0.0.0 --port "${PORT:-8000}"
+    # command: bash /app/start-web.sh
     env_file:
       - .env
     environment:
       PORT: "8000"
       DCP_PROFILE: "${DCP_PROFILE:-pandas}"
       ALLOWED_ORIGINS: "https://${SITE_DOMAIN}"
-      # MLflow-клиент читает это env сам (в коде set_tracking_uri нет).
+      # The MLflow client reads this env itself 
+      # there is no set_tracking_uri call in the code
       MLFLOW_TRACKING_URI: "http://mlflow:5000"
     volumes:
       - dcp_models:/app/models
@@ -41,7 +43,7 @@ services:
       - "traefik.http.routers.dcp-api.tls.certresolver=le"
       - "traefik.http.services.dcp-api.loadbalancer.server.port=8000"
 
-  # ── Frontend (статический дашборд на nginx) ────────────────────────────────
+  # ── Frontend ──────────────────────────────────────────────────────────────────
   frontend:
     build:
       context: ../..
@@ -62,13 +64,15 @@ services:
       - "traefik.http.routers.dcp-front.tls.certresolver=le"
       - "traefik.http.services.dcp-front.loadbalancer.server.port=80"
 
-  # ── Telegram-бот ───────────────────────────────────────────────────────────
-  # Тот же образ, что backend. Long-polling, наружу не публикуется.
+  # ── Telegram-bot ───────────────────────────────────────────────────────────
+  # The same image as backend. Uses long-polling, not exposed externally.
   #
-  # ⚠️ ОТКЛЮЧЁН по умолчанию через `profiles`. На РФ-VDS api.telegram.org
-  # недоступен напрямую: бот стартует → `HTTP Client Request timeout` на polling
-  # → выходит → restart-цикл. Демо живёт через дашборд + Web API, бот не нужен.
-  # Поднять (когда появится зарубежный прокси для Telegram):
+  # ⚠️ Disabled by default via profiles.
+  # On Russian VDS api.telegram.org is not accessible directly: 
+  # the bot starts → HTTP Client Request timeout on polling 
+  # → exits → restart loop. The demo is served via the dashboard + Web API
+  # the bot isn't needed.
+  # To start (when a foreign proxy for Telegram is available):
   #   docker compose --profile bot up -d bot
   bot:
     image: ghcr.io/skerter/distributed-churn-prediction:${IMAGE_TAG:-latest}
@@ -83,9 +87,9 @@ services:
     volumes:
       - dcp_models:/app/models
       - dcp_data:/app/data
-      # ОТДЕЛЬНЫЙ том логов: backend и bot оба запускают _recover_stale_runs()
-      # при старте — если бы стор runs (logs/pipeline_runs) был общим, рестарт
-      # бота помечал бы FAILED активный run, запущенный через backend.
+      # Separate logs volume: backend and bot both run _recover_stale_runs()
+      # at startup — if the runs store (logs/pipeline_runs) were shared, restarting
+      # the bot would mark a run started via backend as FAILED.
       - dcp_bot_logs:/app/logs
       - mlflow_artifacts:/mlflow-artifacts
     networks:
@@ -93,9 +97,9 @@ services:
     depends_on:
       - mlflow
 
-  # ── MLflow UI (поверх Postgres) ────────────────────────────────────────────
-  # build из mlflow/Dockerfile. artifact-root — общий volume с backend/bot,
-  # иначе UI не увидит залогированные клиентом артефакты.
+  # ── MLflow UI (in Postgres) ────────────────────────────────────────────
+  # build from mlflow/Dockerfile. artifact-root is shared volume with backend/bot,
+  # otherwise the UI won't see artifacts logged by the client.
   mlflow:
     build:
       context: ../..
@@ -118,7 +122,7 @@ services:
       - "traefik.http.routers.dcp-mlflow.tls.certresolver=le"
       - "traefik.http.services.dcp-mlflow.loadbalancer.server.port=5000"
 
-  # ── Postgres (backend-store для MLflow) ────────────────────────────────────
+  # ── Postgres (backend-store for MLflow) ────────────────────────────────────
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -136,8 +140,8 @@ volumes:
   mlflow_artifacts:
   dcp_models:
   dcp_data:
-  dcp_logs:       # стор runs backend (Web API)
-  dcp_bot_logs:   # отдельный стор runs бота — не пересекается с backend
+  dcp_logs:       # store runs backend (Web API)
+  dcp_bot_logs:   # separate store runs bot — does not intersect with backend
 
 networks:
   proxy:

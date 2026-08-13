@@ -80,10 +80,9 @@ api:
     pipeline_profile: "dask_k8s"
 
 bot:
-  # Список Telegram user_id, которым разрешён доступ к боту.
-  # Пустой список означает, что бот доступен всем пользователям.
-  # Токен задаётся через переменную окружения TELEGRAM_BOT_TOKEN.
+  # List of users allowed to access the bot. Empty - allowed to all.
+  # Token is set in .env
   admin_chat_ids: []
-  # Максимальное время выполнения pipeline run в секундах (2 часа по умолчанию).
-  # По истечении run помечается FAILED и пользователь получает уведомление.
+  # Maximum pipeline run execution time in seconds (2 hours by default).
+  # After expiration, run is marked as FAILED and user receives notification.
   pipeline_timeout_seconds: 7200
