@@ -44,9 +44,13 @@ hamzaghanmi/expresso-churn-prediction-challenge
 | [Frontend Dashboard](https://dcp.135.106.161.48.nip.io/) | Статический веб-дашборд поверх Web API: запуск пайплайна, мониторинг, история, статистика |
 | Telegram Bot | Push-driven интерфейс для запуска и мониторинга pipeline из чата (на РФ-проде отключён — см. ниже) |
 
-> 🚀 **Live demo:** [dcp.135.106.161.48.nip.io](https://dcp.135.106.161.48.nip.io/) (Selectel VDS за общим Traefik) · API: [api.dcp.135.106.161.48.nip.io](https://api.dcp.135.106.161.48.nip.io/health) · MLflow UI: [mlflow.dcp.135.106.161.48.nip.io](https://mlflow.dcp.135.106.161.48.nip.io/)
+>**Live demo:** [churn.skerter.dev](https://churn.skerter.dev) (Selectel VDS за общим Traefik)
 >
-> Бот в Telegram на текущем VDS **отключён**: с РФ-IP `api.telegram.org` недоступен (long-polling валится в таймаут). Демо живёт через дашборд + Web API.
+>API: [api.churn.skerter.dev](https://api.churn.skerter.dev/docs)
+>
+>MLflow UI: [mlflow.churn.skerter.dev](https://mlflow.churn.skerter.dev)
+>
+> Бот в Telegram на текущем VDS **отключён** (`api.telegram.org` недоступен с датацентра в РФ).
 
 Дополнительно:
 
@@ -113,10 +117,10 @@ hamzaghanmi/expresso-churn-prediction-challenge
   - [Dockerfile](#dockerfile)
   - [GHCR](#ghcr)
   - [GitHub Actions](#github-actions)
-- [Live Demo на Selectel VDS](#live-demo-на-selectel-vds-docker-compose--traefik)
+- [Live Demo на Selectel VDS (docker compose + Traefik)](#live-demo-на-selectel-vds-docker-compose--traefik)
   - [Состав стека](#состав-стека)
   - [Развёртывание](#развёртывание)
-  - [Важные нюансы](#важные-нюансы-грабли-на-которые-уже-наступили)
+  - [Важные нюансы (грабли, на которые уже наступили)](#важные-нюансы-грабли-на-которые-уже-наступили)
 - [Kubernetes manifests и overlays](#kubernetes-manifests-и-overlays)
   - [Структура](#структура)
   - [Base](#base)
@@ -609,7 +613,7 @@ logs/pipeline_runs
 
 # Frontend Dashboard
 
-> 🌐 **Live:** [https://dcp.135.106.161.48.nip.io/](https://dcp.135.106.161.48.nip.io/) (Selectel VDS)
+> 🌐 **Live:** [https://churn.skerter.dev](https://churn.skerter.dev) (Selectel VDS)
 
 `frontend/` — статический веб-дашборд для управления Web API из браузера. Чистый HTML/CSS/Vanilla JS, без сборщиков и npm-зависимостей.
 
@@ -652,7 +656,7 @@ http://localhost:3000
 
 > 💬 **Бот в Telegram:** [@dcp_pipeline_bot](https://t.me/dcp_pipeline_bot)
 >
-> ⚠️ На текущем РФ-VDS (Selectel) бот **отключён** (`profiles: ["bot"]` в `deploy/selectel/compose.yaml`): `api.telegram.org` недоступен с РФ-IP, long-polling валится в таймаут. Поднять, когда появится зарубежный прокси: `docker compose --profile bot up -d bot`.
+> ⚠️ На текущем РФ-VDS (Selectel) бот **отключён** (`profiles: ["bot"]` в `deploy/selectel/compose.yaml`): `api.telegram.org` недоступен.
 
 Telegram-бот — третий presentation layer над тем же core, что и CLI/Web API. Бот работает в режиме long-polling и общается с приложением через `AppContainer`:
 
@@ -684,7 +688,7 @@ pipeline executor
 После нажатия кнопки в `/run` бот запускает pipeline в отдельном треде и сразу возвращает `run_id`:
 
 ```text
-/run → выбор профиля
+/run -> выбор профиля
 BotPipelineExecutor.submit()
 pipeline thread started
 ответ боту: run_id
@@ -1154,13 +1158,13 @@ Live-демо хостится на **Selectel VDS** рядом с другим�
 
 ```bash
 cd /opt/distributed-churn-prediction/deploy/selectel
-cp .env.example .env          # вписать IP в *_DOMAIN, POSTGRES_PASSWORD, (TELEGRAM_BOT_TOKEN)
-docker login ghcr.io          # backend-образ приватный (PAT classic, read:packages)
+cp .env.example .env          # вписать секреты
+docker login ghcr.io          # backend-образ приватный, предварительно залогиниться
 docker compose up -d --build  # mlflow+frontend собираются, backend тянется из GHCR
 docker compose ps             # все Up; backend/bot НЕ Restarting
 ```
 
-Проверка: `https://dcp.<IP>.nip.io/` → Health (зелёный) → Run Pipeline → `succeeded`. MLflow UI на `mlflow.dcp.<IP>.nip.io`.
+Проверка: `https://churn.skerter.dev/` → Health (зелёный) → Run Pipeline → `succeeded`. MLflow UI на `mlflow.churn.skerter.dev`.
 
 ## Важные нюансы (грабли, на которые уже наступили)
 
@@ -1460,7 +1464,8 @@ distributed-churn-prediction/
 │   └── railway/             # Railway-конфиги (мертвы, оставлены как референс команд старта)
 │       ├── railway.bot.toml
 │       ├── railway.backend.toml
-│       └── railway.frontend.toml
+│       ├── railway.frontend.toml
+        └── railway.mlflow.toml
 ├── docker/                  # Docker/контейнерные файлы
 │   ├── Dockerfile
 │   ├── environment.linux.yml
@@ -1509,7 +1514,7 @@ distributed-churn-prediction/
 
 ```text
 presentation
-→application
+application
 orchestration
 infrastructure
 app/bootstrap
