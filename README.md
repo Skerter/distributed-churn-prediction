@@ -41,7 +41,7 @@ hamzaghanmi/expresso-churn-prediction-challenge
 |---|---|
 | CLI | Локальный запуск и отладка pipeline |
 | Web API | HTTP-интерфейс: health-check, конфигурация, модель, запуск pipeline через `run_id` |
-| [Frontend Dashboard](https://dcp.135.106.161.48.nip.io/) | Статический веб-дашборд поверх Web API: запуск пайплайна, мониторинг, история, статистика |
+| Frontend Dashboard | Статический веб-дашборд поверх Web API: запуск пайплайна, мониторинг, история, статистика |
 | Telegram Bot | Push-driven интерфейс для запуска и мониторинга pipeline из чата (на РФ-проде отключён — см. ниже) |
 
 >**Live demo:** [churn.skerter.dev](https://churn.skerter.dev) (Selectel VDS за общим Traefik)
@@ -1146,9 +1146,9 @@ Live-демо хостится на **Selectel VDS** рядом с другим�
 
 | Сервис | Источник образа | Назначение | Домен |
 |---|---|---|---|
-| `backend` | GHCR (`:main`+) | Web API (FastAPI), pipeline in-process | `api.dcp.<IP>.nip.io` |
-| `frontend` | build на сервере | статический дашборд (nginx) | `dcp.<IP>.nip.io` |
-| `mlflow` | build на сервере | MLflow UI поверх Postgres | `mlflow.dcp.<IP>.nip.io` |
+| `backend` | GHCR (`:main`+) | Web API (FastAPI), pipeline in-process | `api.churn.skerter.dev` |
+| `frontend` | build на сервере | статический дашборд (nginx) | `dcp.churn.skerter.dev` |
+| `mlflow` | build на сервере | MLflow UI поверх Postgres | `mlflow.churn.skerter.dev` |
 | `db` | `postgres:16-alpine` | backend-store для MLflow | — (internal) |
 | `bot` | GHCR (тот же образ) | Telegram (за `profiles: ["bot"]`, **отключён**) | — |
 
