@@ -1152,7 +1152,7 @@ Live-демо хостится на **Selectel VDS** рядом с другим�
 | `db` | `postgres:16-alpine` | backend-store для MLflow | — (internal) |
 | `bot` | GHCR (тот же образ) | Telegram (за `profiles: ["bot"]`, **отключён**) | — |
 
-`backend` и `bot` — **один образ**, различаются только `command` (см. `deploy/railway/*.toml`). `frontend`/`mlflow` собираются на сервере (`build:`), в GHCR их нет — CI публикует только backend-образ.
+`backend` и `bot` — **один образ**, различаются только команды запуска контейнера. `frontend`/`mlflow` собираются на сервере (`build:`), в GHCR их нет — CI публикует только backend-образ.
 
 ## Развёртывание
 
