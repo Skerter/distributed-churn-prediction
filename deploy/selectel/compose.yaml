@@ -52,6 +52,7 @@ services:
     environment:
       PORT: "80"
       BACKEND_URL: "https://${API_DOMAIN}"
+      MLFLOW_URL: "https://${MLFLOW_DOMAIN}"
     networks:
       - proxy
     depends_on:

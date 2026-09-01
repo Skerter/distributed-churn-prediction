@@ -1,17 +1,23 @@
 /* ======================================================
    Distributed Churn Prediction — Dashboard JS
    Vanilla JavaScript, без зависимостей.
-   Работает с FastAPI бэкендом на http://127.0.0.1:8000
+   URL сервисов приходят из окружения контейнера; localhost используется локально.
    ====================================================== */
 
 // ====================== КОНФИГУРАЦИЯ ======================
 
-// В Docker placeholder заменяется entrypoint-скриптом. При прямом локальном
-// открытии фронтенда используем FastAPI на стандартном порту.
+// В Docker placeholders заменяются entrypoint-скриптом. При прямом локальном
+// открытии фронтенда используем сервисы на стандартных локальных портах.
 const API_URL_TEMPLATE = '__API_BASE_URL__';
-const API_BASE_URL = API_URL_TEMPLATE.includes('__API_BASE_URL__')
-    ? 'http://127.0.0.1:8000'
-    : API_URL_TEMPLATE.replace(/\/$/, '');
+const MLFLOW_URL_TEMPLATE = '__MLFLOW_URL__';
+
+function resolveServiceUrl(template, fallback) {
+    const isPlaceholder = template.startsWith('__') && template.endsWith('__');
+    return isPlaceholder ? fallback : template.replace(/\/$/, '');
+}
+
+const API_BASE_URL = resolveServiceUrl(API_URL_TEMPLATE, 'http://127.0.0.1:8000');
+const MLFLOW_BASE_URL = resolveServiceUrl(MLFLOW_URL_TEMPLATE, 'http://127.0.0.1:5000');
 
 // Интервал автополлинга статуса (миллисекунды)
 const POLL_INTERVAL_MS = 3000;
@@ -59,6 +65,8 @@ const els = {
     healthOutput:   document.getElementById('healthOutput'),
     healthDot:      document.getElementById('healthDot'),
     liveDot:        document.getElementById('liveDot'),
+    mlflowLink:     document.getElementById('mlflowLink'),
+    appVersion:     document.getElementById('appVersion'),
 
     // Run Pipeline
     runBtn:         document.getElementById('runBtn'),
@@ -610,6 +618,17 @@ function updateProgress(status, data) {
 // ====================== БЛОК 1: HEALTH CHECK ======================
 
 /**
+ * Обновляет метаданные интерфейса значениями, которые backend прочитал из configs/base.yaml.
+ */
+function syncAppMetadata(data) {
+    const version = typeof data?.app_version === 'string' ? data.app_version.trim() : '';
+    if (version && els.appVersion) {
+        els.appVersion.textContent = version;
+        els.appVersion.title = `Версия из configs/base.yaml: ${version}`;
+    }
+}
+
+/**
  * Делает GET /health и отображает ответ.
  */
 async function checkHealth() {
@@ -617,6 +636,7 @@ async function checkHealth() {
 
     try {
         const data = await apiRequest('/health', { method: 'GET' });
+        syncAppMetadata(data);
 
         // Считаем сервер живым, если ответ пришёл со статусом 200
         els.healthDot.dataset.status = 'ok';
@@ -1067,7 +1087,8 @@ function handleHotkey(event) {
  */
 async function silentHealthPing() {
     try {
-        await apiRequest('/health', { method: 'GET' });
+        const data = await apiRequest('/health', { method: 'GET' });
+        syncAppMetadata(data);
         els.liveDot.dataset.status = 'ok';
         document.getElementById('apiInfo').setAttribute('aria-label', `API доступен: ${API_BASE_URL}`);
     } catch {
@@ -1113,6 +1134,8 @@ window.addEventListener('beforeunload', () => {
 // Показываем реальный адрес бэкенда в заголовке
 document.getElementById('apiUrl').textContent = API_BASE_URL.replace(/^https?:\/\//, '');
 document.getElementById('apiInfo').title = API_BASE_URL;
+els.mlflowLink.href = MLFLOW_BASE_URL;
+els.mlflowLink.title = `Открыть MLflow: ${MLFLOW_BASE_URL}`;
 
 syncThemeUI();
 updatePlanSummary();
@@ -1129,4 +1152,5 @@ setInterval(silentHealthPing, 30000);
 // Сообщаем пользователю в консоль, что фронт готов к работе
 console.log('%c[Distributed Churn Prediction] Dashboard initialized', 'color: #4f46e5; font-weight: bold');
 console.log('API base URL:', API_BASE_URL);
+console.log('MLflow URL:', MLFLOW_BASE_URL);
 console.log('Нажмите ? для списка горячих клавиш');

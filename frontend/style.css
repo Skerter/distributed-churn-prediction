@@ -249,6 +249,27 @@ a {
     white-space: nowrap;
 }
 
+.service-link {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.service-link-label {
+    display: none;
+}
+
 .live-dot,
 .status-dot {
     display: inline-block;
@@ -750,9 +771,9 @@ a {
 }
 
 .btn-secondary {
-    border-color: color-mix(in srgb, var(--text-on-dark) 25%, transparent);
-    background: color-mix(in srgb, var(--text-on-dark) 10%, transparent);
-    color: var(--text-on-dark);
+    border-color: var(--border-strong);
+    background: var(--surface-soft);
+    color: var(--text);
 }
 
 .btn:disabled {
@@ -929,19 +950,19 @@ a {
 }
 
 .status-card {
-    background: var(--surface-dark);
-    color: var(--text-on-dark);
+    background: var(--surface);
+    color: var(--text);
 }
 
 .status-card .card-header {
-    border-color: color-mix(in srgb, var(--text-on-dark) 16%, transparent);
+    border-color: var(--border);
 }
 
 .status-card .section-index,
 .status-card .card-description,
 .status-card .status-caption,
 .status-card .toggle-hint {
-    color: var(--text-on-dark-muted);
+    color: var(--text-muted);
 }
 
 .status-body {
@@ -953,10 +974,10 @@ a {
 .status-badge {
     flex: 0 0 auto;
     padding: 6px 9px;
-    border: 1px solid color-mix(in srgb, var(--text-on-dark) 18%, transparent);
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: color-mix(in srgb, var(--text-on-dark) 8%, transparent);
-    color: var(--text-on-dark-muted);
+    background: var(--surface-soft);
+    color: var(--text-muted);
     font-family: var(--mono);
     font-size: 0.58rem;
     font-weight: 750;
@@ -1000,9 +1021,9 @@ a {
     justify-content: space-between;
     gap: 14px;
     padding: 15px;
-    border: 1px solid color-mix(in srgb, var(--text-on-dark) 14%, transparent);
+    border: 1px solid var(--border);
     border-radius: 13px;
-    background: color-mix(in srgb, var(--text-on-dark) 5%, transparent);
+    background: var(--surface-soft);
 }
 
 .status-info.active {
@@ -1048,7 +1069,7 @@ a {
     height: 6px;
     overflow: hidden;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--text-on-dark) 13%, transparent);
+    background: var(--border);
 }
 
 .progress-bar {
@@ -1087,7 +1108,7 @@ a {
     position: relative;
     overflow: hidden;
     padding-top: 10px;
-    color: var(--text-on-dark-muted);
+    color: var(--text-muted);
     font-family: var(--mono);
     font-size: 0.5rem;
     text-align: center;
@@ -1128,7 +1149,7 @@ a {
     align-items: center;
     gap: 10px;
     padding: 9px 12px;
-    border: 1px solid color-mix(in srgb, var(--text-on-dark) 14%, transparent);
+    border: 1px solid var(--border);
     border-radius: 12px;
     cursor: pointer;
 }
@@ -1144,7 +1165,7 @@ a {
     height: 22px;
     flex: 0 0 auto;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--text-on-dark) 18%, transparent);
+    background: var(--border-strong);
     transition: background 160ms ease;
 }
 
@@ -1155,7 +1176,7 @@ a {
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: var(--text-on-dark);
+    background: var(--surface-raised);
     content: "";
     transition: transform 160ms ease;
 }
@@ -1184,19 +1205,19 @@ a {
 }
 
 .status-card .response-panel {
-    border-color: color-mix(in srgb, var(--text-on-dark) 14%, transparent);
-    background: color-mix(in srgb, var(--text-on-dark) 5%, transparent);
+    border-color: var(--border);
+    background: var(--surface-raised);
 }
 
 .status-card .response-panel summary,
 .status-card .response-type {
-    color: var(--text-on-dark-muted);
+    color: var(--text-muted);
 }
 
 .status-card .output {
-    border-color: color-mix(in srgb, var(--text-on-dark) 14%, transparent);
-    background: color-mix(in srgb, var(--text-on-dark) 5%, transparent);
-    color: var(--text-on-dark-muted);
+    border-color: var(--border);
+    background: var(--surface-soft);
+    color: var(--text-muted);
 }
 
 .status-card .output.error {
@@ -1466,12 +1487,14 @@ input:focus-visible + .checkbox-control,
 
 @media (hover: hover) {
     .theme-toggle:hover,
+    .service-link:hover,
     .btn-icon:hover,
     .preset-btn:hover {
         border-color: var(--border-strong);
     }
 
     .theme-toggle:hover,
+    .service-link:hover,
     .btn:not(:disabled):hover {
         transform: translateY(-1px);
     }
@@ -1493,6 +1516,18 @@ input:focus-visible + .checkbox-control,
 
     .api-info {
         max-width: 220px;
+    }
+
+    .service-link {
+        display: inline-flex;
+        width: auto;
+        padding: 0 13px;
+        gap: 6px;
+        border-radius: 999px;
+    }
+
+    .service-link-label {
+        display: inline;
     }
 
     .logo-icon {

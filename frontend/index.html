@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#f4f5f0">
     <meta name="description" content="Панель управления ML-пайплайном Distributed Churn Prediction">
     <title>Distributed Churn Prediction — Dashboard</title>
-    <link rel="stylesheet" href="style.css?v=20260901-mobile-fit">
+    <link rel="stylesheet" href="style.css?v=20260901-theme-fix">
     <script>
         (function () {
             let saved = null;
@@ -46,6 +46,11 @@
                         </span>
                     </div>
 
+                    <a class="service-link" id="mlflowLink" href="http://127.0.0.1:5000" target="_blank" rel="noopener noreferrer" aria-label="Открыть MLflow в новой вкладке">
+                        <span class="service-link-label">MLflow</span>
+                        <span aria-hidden="true">↗</span>
+                    </a>
+
                     <button id="themeToggle" class="theme-toggle" type="button" aria-label="Переключить тему" aria-pressed="false" title="Переключить тему (T)">
                         <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
                             <circle cx="12" cy="12" r="3.5"></circle>
@@ -60,7 +65,7 @@
 
             <div class="hero">
                 <div class="hero-copy">
-                    <p class="eyebrow"><span>ML operations</span><span>v0.4</span></p>
+                    <p class="eyebrow"><span>ML operations</span><span id="appVersion">v0.4.0</span></p>
                     <h1>Управляйте пайплайном.<br><em>Наблюдайте за результатом.</em></h1>
                     <p class="hero-lead">Один рабочий экран для запуска, мониторинга и разбора экспериментов по прогнозированию оттока.</p>
                 </div>
@@ -312,6 +317,6 @@
         </div>
     </footer>
 
-    <script src="app.js?v=20260901-mobile-fit"></script>
+    <script src="app.js?v=20260901-config-version"></script>
 </body>
 </html>
