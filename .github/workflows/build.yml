@@ -120,5 +120,5 @@ jobs:
             git pull origin ${{ github.ref_name }}
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USER }} --password-stdin
             docker compose -f deploy/selectel/compose.yaml pull
-            docker compose -f deploy/selectel/compose.yaml up -d
+            docker compose -f deploy/selectel/compose.yaml up -d --build
             docker image prune -f
