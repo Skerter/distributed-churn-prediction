@@ -3,295 +3,312 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f4f5f0">
+    <meta name="description" content="Панель управления ML-пайплайном Distributed Churn Prediction">
     <title>Distributed Churn Prediction — Dashboard</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Применяем сохранённую тему до загрузки CSS, чтобы избежать "вспышки" светлой темы -->
     <script>
         (function () {
-            const saved = localStorage.getItem('dcp-theme');
+            let saved = null;
+            try {
+                const stored = localStorage.getItem('dcp-theme');
+                saved = stored === 'dark' || stored === 'light' ? stored : null;
+            } catch (_) {
+                // Тема останется системной, если storage недоступен.
+            }
             const system = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
             document.documentElement.dataset.theme = saved || system;
         })();
     </script>
 </head>
 <body>
-    <!-- Декоративные размытые "пузыри" на фоне для красоты -->
-    <div class="bg-blobs" aria-hidden="true">
-        <span class="bg-blob blob-1"></span>
-        <span class="bg-blob blob-2"></span>
-        <span class="bg-blob blob-3"></span>
-    </div>
+    <a class="skip-link" href="#mainContent">К основному содержимому</a>
+    <div class="page-noise" aria-hidden="true"></div>
 
-    <!-- Шапка дашборда с заголовком проекта и описанием -->
     <header class="header">
         <div class="container">
             <div class="header-inner">
-                <div class="logo">
-                    <div class="logo-icon">DC</div>
-                    <div>
-                        <h1>Distributed Churn Prediction</h1>
-                        <p class="subtitle">ML Pipeline Control Dashboard</p>
-                    </div>
-                </div>
+                <a class="logo" href="#mainContent" aria-label="Distributed Churn Prediction — главная">
+                    <span class="logo-icon" aria-hidden="true">DC</span>
+                    <span class="logo-copy">
+                        <span class="logo-name">Distributed Churn Prediction</span>
+                        <span class="subtitle">control plane</span>
+                    </span>
+                </a>
 
                 <div class="header-controls">
-                    <!-- Индикатор подключения к API -->
-                    <div class="api-info">
-                        <span class="live-dot" id="liveDot" data-status="unknown" title="Статус подключения"></span>
-                        <span class="api-label">API</span>
-                        <span class="api-url" id="apiUrl">http://127.0.0.1:8000</span>
+                    <div class="api-info" id="apiInfo" title="Адрес API">
+                        <span class="live-dot" id="liveDot" data-status="unknown" aria-hidden="true"></span>
+                        <span class="api-copy">
+                            <span class="api-label">API</span>
+                            <span class="api-url" id="apiUrl">http://127.0.0.1:8000</span>
+                        </span>
                     </div>
 
-                    <!-- Переключатель темы (солнце/луна) -->
-                    <button id="themeToggle" class="theme-toggle" aria-label="Переключить тему" title="Переключить тему (T)">
-                        <span class="icon-sun">☀️</span>
-                        <span class="icon-moon">🌙</span>
+                    <button id="themeToggle" class="theme-toggle" type="button" aria-label="Переключить тему" aria-pressed="false" title="Переключить тему (T)">
+                        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3.5"></circle>
+                            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+                        </svg>
+                        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z"></path>
+                        </svg>
                     </button>
                 </div>
             </div>
 
-            <!-- ====================================================== -->
-            <!--          СТАТИСТИКА (живые счётчики)                     -->
-            <!-- ====================================================== -->
-            <div class="stats-bar">
-                <div class="stat-card" data-kind="total">
-                    <div class="stat-label">Всего запусков</div>
-                    <div class="stat-value" id="statTotal" data-target="0">0</div>
-                    <div class="stat-sub">за текущую сессию</div>
+            <div class="hero">
+                <div class="hero-copy">
+                    <p class="eyebrow"><span>ML operations</span><span>v0.4</span></p>
+                    <h1>Управляйте пайплайном.<br><em>Наблюдайте за результатом.</em></h1>
+                    <p class="hero-lead">Один рабочий экран для запуска, мониторинга и разбора экспериментов по прогнозированию оттока.</p>
                 </div>
-                <div class="stat-card" data-kind="success">
-                    <div class="stat-label">Успешные</div>
+
+                <div class="hero-flow" aria-label="Этапы ML-пайплайна">
+                    <div class="flow-node"><span>01</span><strong>Load</strong></div>
+                    <div class="flow-line" aria-hidden="true"></div>
+                    <div class="flow-node"><span>02</span><strong>Preprocess</strong></div>
+                    <div class="flow-line" aria-hidden="true"></div>
+                    <div class="flow-node"><span>03</span><strong>Train</strong></div>
+                    <div class="flow-line" aria-hidden="true"></div>
+                    <div class="flow-node"><span>04</span><strong>Evaluate</strong></div>
+                </div>
+            </div>
+
+            <div class="stats-bar" aria-label="Статистика запусков">
+                <article class="stat-card" data-kind="total">
+                    <div class="stat-topline"><span class="stat-label">Запуски</span><span class="stat-mark">Σ</span></div>
+                    <div class="stat-value" id="statTotal" data-target="0">0</div>
+                    <div class="stat-sub">сохранено локально</div>
+                </article>
+                <article class="stat-card" data-kind="success">
+                    <div class="stat-topline"><span class="stat-label">Успешные</span><span class="stat-mark">↗</span></div>
                     <div class="stat-value" id="statSuccess" data-target="0">0</div>
                     <div class="stat-sub" id="statSuccessRate">0% успеха</div>
-                </div>
-                <div class="stat-card" data-kind="failed">
-                    <div class="stat-label">Ошибки</div>
+                </article>
+                <article class="stat-card" data-kind="failed">
+                    <div class="stat-topline"><span class="stat-label">Ошибки</span><span class="stat-mark">!</span></div>
                     <div class="stat-value" id="statFailed" data-target="0">0</div>
-                    <div class="stat-sub">failed / queued</div>
-                </div>
-                <div class="stat-card" data-kind="time">
-                    <div class="stat-label">Средн. время</div>
-                    <div class="stat-value" id="statAvgTime">—</div>
+                    <div class="stat-sub">завершились с failed</div>
+                </article>
+                <article class="stat-card" data-kind="time">
+                    <div class="stat-topline"><span class="stat-label">Среднее время</span><span class="stat-mark">◷</span></div>
+                    <div class="stat-value stat-value-time" id="statAvgTime">—</div>
                     <div class="stat-sub">по завершённым</div>
-                </div>
+                </article>
             </div>
         </div>
     </header>
 
-    <main class="container main-grid">
-
-        <!-- ====================================================== -->
-        <!--               БЛОК 1: HEALTH CHECK                       -->
-        <!-- ====================================================== -->
-        <section class="card">
+    <main class="container main-grid" id="mainContent">
+        <section class="card run-card">
             <div class="card-header">
-                <div>
-                    <h2>Health Check</h2>
-                    <p class="card-description">Проверка доступности сервера API</p>
+                <div class="card-title-group">
+                    <span class="section-index">01</span>
+                    <div>
+                        <h2>Новый запуск</h2>
+                        <p class="card-description">Соберите сценарий выполнения</p>
+                    </div>
                 </div>
-                <!-- Цветная точка отражает текущее состояние сервера -->
-                <span class="status-dot" id="healthDot" data-status="unknown"></span>
+                <span class="card-kicker">Configure</span>
             </div>
 
             <div class="card-body">
-                <button id="healthBtn" class="btn btn-primary">
-                    <span class="btn-text">Проверить статус</span>
-                    <span class="kbd">H</span>
-                </button>
-
-                <!-- Сюда выводится JSON-ответ от GET /health -->
-                <pre class="output" id="healthOutput">Нажмите кнопку, чтобы проверить статус сервера...</pre>
-            </div>
-        </section>
-
-        <!-- ====================================================== -->
-        <!--           БЛОК 2: ЗАПУСК ML ПАЙПЛАЙНА                    -->
-        <!-- ====================================================== -->
-        <section class="card">
-            <div class="card-header">
-                <div>
-                    <h2>Запуск ML Pipeline</h2>
-                    <p class="card-description">Параметры выполнения пайплайна</p>
-                </div>
-            </div>
-
-            <div class="card-body">
-                <!-- Быстрые пресеты конфигурации -->
-                <div class="preset-row">
-                    <span>Пресеты:</span>
-                    <button class="preset-btn" data-preset="full">Полный прогон</button>
-                    <button class="preset-btn" data-preset="train-only">Только обучение</button>
-                    <button class="preset-btn" data-preset="dry-run">Dry-run</button>
-                    <button class="preset-btn" data-preset="reset">Сброс</button>
+                <div class="preset-row" aria-label="Пресеты запуска">
+                    <span class="field-label">Быстрый выбор</span>
+                    <div class="preset-list">
+                        <button class="preset-btn" type="button" data-preset="full">Полный</button>
+                        <button class="preset-btn" type="button" data-preset="train-only">Обучение</button>
+                        <button class="preset-btn" type="button" data-preset="dry-run">Dry-run</button>
+                        <button class="preset-btn" type="button" data-preset="reset">Сброс</button>
+                    </div>
                 </div>
 
-                <!-- Чекбоксы для управления параметрами POST /pipeline/runs -->
-                <div class="checkbox-group">
-                    <label class="checkbox">
-                        <input type="checkbox" id="execute" checked>
-                        <span class="checkbox-label">execute</span>
-                        <span class="checkbox-hint">Запустить выполнение</span>
-                    </label>
-                    <label class="checkbox">
-                        <input type="checkbox" id="skip_load">
-                        <span class="checkbox-label">skip_load</span>
-                        <span class="checkbox-hint">Пропустить загрузку данных</span>
-                    </label>
-                    <label class="checkbox">
-                        <input type="checkbox" id="skip_features">
-                        <span class="checkbox-label">skip_features</span>
-                        <span class="checkbox-hint">Пропустить feature engineering</span>
-                    </label>
-                    <label class="checkbox">
-                        <input type="checkbox" id="skip_train">
-                        <span class="checkbox-label">skip_train</span>
-                        <span class="checkbox-hint">Пропустить обучение модели</span>
-                    </label>
-                    <label class="checkbox">
-                        <input type="checkbox" id="skip_eval">
-                        <span class="checkbox-label">skip_eval</span>
-                        <span class="checkbox-hint">Пропустить оценку модели</span>
-                    </label>
+                <fieldset class="pipeline-options">
+                    <legend class="field-label">Этапы и режим</legend>
+                    <div class="checkbox-group">
+                        <label class="checkbox checkbox-primary">
+                            <input type="checkbox" id="execute" checked>
+                            <span class="checkbox-control" aria-hidden="true"></span>
+                            <span class="checkbox-copy"><span class="checkbox-label">Выполнить запуск</span><span class="checkbox-hint">Снимите для безопасного dry-run</span></span>
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="skip_load">
+                            <span class="checkbox-control" aria-hidden="true"></span>
+                            <span class="checkbox-copy"><span class="checkbox-label">Загрузка данных</span><span class="checkbox-hint">Пропустить этап</span></span>
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="skip_features">
+                            <span class="checkbox-control" aria-hidden="true"></span>
+                            <span class="checkbox-copy"><span class="checkbox-label">Feature engineering</span><span class="checkbox-hint">Пропустить этап</span></span>
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="skip_train">
+                            <span class="checkbox-control" aria-hidden="true"></span>
+                            <span class="checkbox-copy"><span class="checkbox-label">Обучение модели</span><span class="checkbox-hint">Пропустить этап</span></span>
+                        </label>
+                        <label class="checkbox">
+                            <input type="checkbox" id="skip_eval">
+                            <span class="checkbox-control" aria-hidden="true"></span>
+                            <span class="checkbox-copy"><span class="checkbox-label">Оценка качества</span><span class="checkbox-hint">Пропустить этап</span></span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <div class="plan-summary" id="planSummary" aria-live="polite">
+                    <span class="plan-label">План</span>
+                    <span class="plan-value" id="planValue">4 этапа · реальный запуск</span>
                 </div>
 
-                <button id="runBtn" class="btn btn-success">
-                    <span class="btn-text">Запустить Pipeline</span>
+                <button id="runBtn" class="btn btn-success btn-block" type="button">
+                    <span class="btn-text">Запустить pipeline</span>
+                    <span class="btn-arrow" aria-hidden="true">↗</span>
                     <span class="kbd">R</span>
                 </button>
 
-                <!-- Здесь покажется присвоенный run_id после успешного POST-запроса -->
                 <div class="run-id-display" id="runIdDisplay" hidden>
-                    <span class="run-id-label">Run ID:</span>
+                    <span class="run-id-label">Run ID</span>
                     <code class="run-id-value" id="runIdValue"></code>
-                    <button class="btn-icon" id="copyRunId" title="Скопировать run_id">⧉</button>
+                    <button class="btn-icon" id="copyRunId" type="button" aria-label="Скопировать run ID" title="Скопировать run ID">⧉</button>
                 </div>
 
-                <!-- Полный JSON-ответ при создании запуска -->
-                <pre class="output" id="runOutput">Pipeline ещё не запускался...</pre>
+                <details class="response-panel">
+                    <summary><span>Ответ на запуск</span><span class="response-type">JSON</span></summary>
+                    <pre class="output" id="runOutput">Pipeline ещё не запускался...</pre>
+                </details>
             </div>
         </section>
 
-        <!-- ====================================================== -->
-        <!--           БЛОК 3: СТАТУС ЗАПУСКА                         -->
-        <!-- ====================================================== -->
-        <section class="card card-wide">
+        <section class="card status-card">
             <div class="card-header">
-                <div>
-                    <h2>Статус пайплайна</h2>
-                    <p class="card-description">Мониторинг текущего запуска</p>
+                <div class="card-title-group">
+                    <span class="section-index">02</span>
+                    <div>
+                        <h2>Текущий прогон</h2>
+                        <p class="card-description">Статус и прогресс выполнения</p>
+                    </div>
                 </div>
-                <!-- Цветной бейдж со статусом: queued / running / succeeded / failed -->
-                <span class="status-badge" id="statusBadge" data-status="idle">—</span>
+                <span class="status-badge" id="statusBadge" data-status="idle">Ожидание</span>
             </div>
 
-            <div class="card-body">
-                <div class="status-controls">
-                    <button id="statusBtn" class="btn btn-secondary" disabled>
-                        <span class="btn-text">Проверить статус запуска</span>
-                        <span class="kbd">S</span>
-                    </button>
-
-                    <!-- Переключатель автополлинга каждые 3 секунды -->
-                    <label class="toggle">
-                        <input type="checkbox" id="autoPoll" checked>
-                        <span class="toggle-slider"></span>
-                        <span class="toggle-label">Автообновление (3с)</span>
-                    </label>
-                </div>
-
-                <!-- Информационная строка о том, что сейчас отслеживается -->
+            <div class="card-body status-body">
                 <div class="status-info" id="statusInfo">
-                    <span id="statusInfoText">Нет активного запуска. Запустите Pipeline, чтобы начать отслеживание.</span>
+                    <div class="status-copy">
+                        <span class="status-caption">Состояние</span>
+                        <span id="statusInfoText">Запуск ещё не выбран</span>
+                    </div>
                     <span class="duration-timer" id="durationTimer" hidden>00:00</span>
                 </div>
 
-                <!-- Прогресс-бар выполнения с шагами -->
-                <div>
-                    <div class="progress">
+                <div class="progress-wrap">
+                    <div class="progress" role="progressbar" aria-label="Прогресс пайплайна" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                         <div class="progress-bar" id="progressBar"></div>
                     </div>
                     <div class="progress-steps" id="progressSteps">
-                        <span class="step" data-step="load">Loading</span>
-                        <span class="step" data-step="features">Features</span>
-                        <span class="step" data-step="train">Training</span>
-                        <span class="step" data-step="eval">Eval</span>
+                        <span class="step" data-step="load">Load</span>
+                        <span class="step" data-step="features">Preprocess</span>
+                        <span class="step" data-step="train">Train</span>
+                        <span class="step" data-step="eval">Evaluate</span>
                         <span class="step" data-step="done">Done</span>
                     </div>
                 </div>
 
-                <!-- Полный JSON-ответ от GET /pipeline/runs/{run_id} -->
-                <pre class="output" id="statusOutput">—</pre>
+                <div class="status-controls">
+                    <button id="statusBtn" class="btn btn-secondary" type="button" disabled>
+                        <span class="btn-text">Обновить статус</span>
+                        <span class="kbd">S</span>
+                    </button>
+
+                    <label class="toggle">
+                        <input type="checkbox" id="autoPoll" checked>
+                        <span class="toggle-slider" aria-hidden="true"></span>
+                        <span class="toggle-copy"><span class="toggle-label">Автообновление</span><span class="toggle-hint">каждые 3 секунды</span></span>
+                    </label>
+                </div>
+
+                <details class="response-panel response-panel-status">
+                    <summary><span>Данные текущего запуска</span><span class="response-type">JSON</span></summary>
+                    <pre class="output" id="statusOutput">—</pre>
+                </details>
             </div>
         </section>
 
-        <!-- ====================================================== -->
-        <!--           БЛОК 4: ИСТОРИЯ ЗАПУСКОВ                       -->
-        <!-- ====================================================== -->
-        <section class="card">
+        <section class="card history-card">
             <div class="card-header">
-                <div>
-                    <h2>История запусков</h2>
-                    <p class="card-description">Последние пайплайны этой сессии</p>
+                <div class="card-title-group">
+                    <span class="section-index">03</span>
+                    <div>
+                        <h2>История</h2>
+                        <p class="card-description">Последние 10 запусков на этом устройстве</p>
+                    </div>
                 </div>
-                <button class="btn-icon" id="clearHistory" title="Очистить историю">✕</button>
+                <button class="btn-icon" id="clearHistory" type="button" aria-label="Очистить историю" title="Очистить историю">✕</button>
             </div>
 
             <div class="card-body">
                 <div class="history-list" id="historyList">
-                    <div class="history-empty">История пуста — запустите первый пайплайн</div>
+                    <div class="history-empty"><span class="empty-mark" aria-hidden="true">↳</span><span>Здесь появятся ваши запуски</span></div>
                 </div>
             </div>
         </section>
 
-        <!-- ====================================================== -->
-        <!--           БЛОК 5: ГОРЯЧИЕ КЛАВИШИ                        -->
-        <!-- ====================================================== -->
-        <section class="card shortcuts-card">
+        <section class="card health-card">
             <div class="card-header">
-                <div>
-                    <h2>Горячие клавиши</h2>
-                    <p class="card-description">Управление с клавиатуры</p>
+                <div class="card-title-group">
+                    <span class="section-index">04</span>
+                    <div>
+                        <h2>Диагностика API</h2>
+                        <p class="card-description">Связь с FastAPI backend</p>
+                    </div>
+                </div>
+                <span class="status-dot" id="healthDot" data-status="unknown" aria-label="Статус API"></span>
+            </div>
+
+            <div class="card-body">
+                <div class="health-callout"><span class="health-label">Endpoint</span><code>GET /health</code></div>
+                <button id="healthBtn" class="btn btn-primary btn-block" type="button">
+                    <span class="btn-text">Проверить соединение</span>
+                    <span class="kbd">H</span>
+                </button>
+
+                <details class="response-panel">
+                    <summary><span>Ответ сервера</span><span class="response-type">JSON</span></summary>
+                    <pre class="output" id="healthOutput">Нажмите кнопку, чтобы проверить статус сервера...</pre>
+                </details>
+            </div>
+        </section>
+
+        <section class="card shortcuts-card">
+            <div class="card-header shortcuts-heading">
+                <div class="card-title-group">
+                    <span class="section-index">05</span>
+                    <div>
+                        <h2>Быстрые действия</h2>
+                        <p class="card-description">Клавиатура ускоряет повторяющиеся операции</p>
+                    </div>
                 </div>
             </div>
 
             <div class="card-body">
                 <div class="shortcuts-list">
-                    <div class="shortcut-item">
-                        <span class="shortcut-key">H</span>
-                        <span>Health check</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-key">R</span>
-                        <span>Запустить Pipeline</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-key">S</span>
-                        <span>Обновить статус</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-key">T</span>
-                        <span>Переключить тему</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-key">C</span>
-                        <span>Копировать run_id</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-key">?</span>
-                        <span>Подсказка в консоли</span>
-                    </div>
+                    <div class="shortcut-item"><span class="shortcut-key">H</span><span>Health check</span></div>
+                    <div class="shortcut-item"><span class="shortcut-key">R</span><span>Запустить pipeline</span></div>
+                    <div class="shortcut-item"><span class="shortcut-key">S</span><span>Обновить статус</span></div>
+                    <div class="shortcut-item"><span class="shortcut-key">T</span><span>Переключить тему</span></div>
+                    <div class="shortcut-item"><span class="shortcut-key">C</span><span>Копировать run ID</span></div>
+                    <div class="shortcut-item"><span class="shortcut-key">?</span><span>Открыть подсказку</span></div>
                 </div>
             </div>
         </section>
-
     </main>
 
-    <!-- Контейнер для toast-уведомлений -->
-    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+    <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
     <footer class="footer">
-        <div class="container">
-            <p>Distributed Churn Prediction · University ML Project</p>
+        <div class="container footer-inner">
+            <p>Distributed Churn Prediction</p>
+            <p>ML engineering playground · 2026</p>
         </div>
     </footer>
 

@@ -6,8 +6,12 @@
 
 // ====================== КОНФИГУРАЦИЯ ======================
 
-// Базовый URL бэкенда. Меняется в одном месте, если адрес поменяется.
-const API_BASE_URL = '__API_BASE_URL__';
+// В Docker placeholder заменяется entrypoint-скриптом. При прямом локальном
+// открытии фронтенда используем FastAPI на стандартном порту.
+const API_URL_TEMPLATE = '__API_BASE_URL__';
+const API_BASE_URL = API_URL_TEMPLATE.includes('__API_BASE_URL__')
+    ? 'http://127.0.0.1:8000'
+    : API_URL_TEMPLATE.replace(/\/$/, '');
 
 // Интервал автополлинга статуса (миллисекунды)
 const POLL_INTERVAL_MS = 3000;
@@ -30,6 +34,10 @@ let currentRunId = null;
 
 // Идентификатор активного setInterval для поллинга. null, если поллинг не активен.
 let pollIntervalId = null;
+
+// Не допускаем наложения запросов одного run, но разрешаем мгновенно
+// переключиться на другой элемент истории.
+let activeStatusRunId = null;
 
 // Таймер длительности текущего запуска
 let durationTimerId = null;
@@ -76,6 +84,7 @@ const els = {
     durationTimer:  document.getElementById('durationTimer'),
     progressBar:    document.getElementById('progressBar'),
     progressSteps:  document.getElementById('progressSteps'),
+    planValue:      document.getElementById('planValue'),
 
     // Тема
     themeToggle:    document.getElementById('themeToggle'),
@@ -121,7 +130,10 @@ function toast({ title, message = '', kind = 'info', timeout = 4000 }) {
     el.querySelector('.toast-title').textContent = title;
     el.querySelector('.toast-message').textContent = message;
 
+    let dismissed = false;
     const dismiss = () => {
+        if (dismissed) return;
+        dismissed = true;
         el.classList.add('toast-out');
         setTimeout(() => el.remove(), 250);
     };
@@ -215,7 +227,12 @@ function toggleTheme() {
     const current = document.documentElement.dataset.theme || 'light';
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
-    localStorage.setItem(LS_THEME, next);
+    try {
+        localStorage.setItem(LS_THEME, next);
+    } catch (_) {
+        // Тема всё равно меняется для текущей вкладки.
+    }
+    syncThemeUI();
 
     toast({
         kind: 'info',
@@ -225,6 +242,14 @@ function toggleTheme() {
     });
 }
 
+function syncThemeUI() {
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    els.themeToggle.setAttribute('aria-pressed', String(isDark));
+    els.themeToggle.setAttribute('aria-label', isDark ? 'Включить светлую тему' : 'Включить тёмную тему');
+    document.querySelector('meta[name="theme-color"]')
+        ?.setAttribute('content', isDark ? '#0d1210' : '#f2f3ed');
+}
+
 
 // ====================== СТАТИСТИКА ======================
 
@@ -232,6 +257,11 @@ function toggleTheme() {
  * Плавно анимирует число от текущего к целевому за указанное время.
  */
 function animateNumber(element, from, to, durationMs = 600) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        element.textContent = to;
+        return;
+    }
+
     const start = performance.now();
     const delta = to - from;
 
@@ -298,7 +328,10 @@ function persistHistory() {
 function loadHistory() {
     try {
         const raw = localStorage.getItem(LS_HISTORY);
-        if (raw) history = JSON.parse(raw) || [];
+        const stored = raw ? JSON.parse(raw) : [];
+        history = Array.isArray(stored)
+            ? stored.filter(item => item && typeof item.run_id === 'string').slice(0, HISTORY_LIMIT)
+            : [];
     } catch (e) {
         history = [];
     }
@@ -332,27 +365,60 @@ function updateHistoryEntry(runId, patch) {
  */
 function renderHistory() {
     if (history.length === 0) {
-        els.historyList.innerHTML = '<div class="history-empty">История пуста — запустите первый пайплайн</div>';
+        els.historyList.innerHTML = `
+            <div class="history-empty">
+                <span class="empty-mark" aria-hidden="true">↳</span>
+                <span>Здесь появятся ваши запуски</span>
+            </div>
+        `;
         return;
     }
 
     els.historyList.innerHTML = '';
     history.forEach(entry => {
-        const item = document.createElement('div');
+        const normalizedStatus = typeof entry.status === 'string'
+            ? entry.status.toLowerCase()
+            : 'unknown';
+        const safeStatus = ['queued', 'running', 'succeeded', 'failed'].includes(normalizedStatus)
+            ? normalizedStatus
+            : 'unknown';
+        const item = document.createElement('button');
+        item.type = 'button';
         item.className = 'history-item';
         if (entry.run_id === currentRunId) item.classList.add('active');
         item.dataset.runId = entry.run_id;
 
-        const time = new Date(entry.startedAt).toLocaleTimeString('ru-RU', { hour12: false });
+        const startedAt = entry.startedAt == null ? null : new Date(entry.startedAt);
+        const time = !startedAt || Number.isNaN(startedAt.getTime())
+            ? 'время неизвестно'
+            : startedAt.toLocaleString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+            });
         const shortId = entry.run_id.length > 18 ? entry.run_id.slice(0, 16) + '…' : entry.run_id;
+        item.setAttribute('aria-label', `Открыть запуск ${entry.run_id}, статус ${safeStatus}`);
 
-        item.innerHTML = `
-            <span class="history-status-dot" data-status="${entry.status}"></span>
-            <span class="history-id" title="${entry.run_id}"></span>
-            <span class="history-time">${time}</span>
-            <span class="history-status">${entry.status}</span>
-        `;
-        item.querySelector('.history-id').textContent = shortId;
+        const dot = document.createElement('span');
+        dot.className = 'history-status-dot';
+        dot.dataset.status = safeStatus;
+
+        const id = document.createElement('span');
+        id.className = 'history-id';
+        id.title = entry.run_id;
+        id.textContent = shortId;
+
+        const timestamp = document.createElement('span');
+        timestamp.className = 'history-time';
+        timestamp.textContent = time;
+
+        const status = document.createElement('span');
+        status.className = 'history-status';
+        status.textContent = safeStatus;
+
+        item.append(dot, id, timestamp, status);
 
         // Клик по элементу истории — переключиться на этот run для отслеживания
         item.addEventListener('click', () => switchToHistoricalRun(entry.run_id));
@@ -364,7 +430,10 @@ function renderHistory() {
 /**
  * Делает указанный run_id из истории "текущим" — позволяет посмотреть его статус.
  */
-function switchToHistoricalRun(runId) {
+async function switchToHistoricalRun(runId) {
+    stopPolling();
+    stopDurationTimer();
+    els.durationTimer.hidden = true;
     currentRunId = runId;
     els.runIdValue.textContent = runId;
     els.runIdDisplay.hidden = false;
@@ -372,13 +441,26 @@ function switchToHistoricalRun(runId) {
 
     const entry = history.find(h => h.run_id === runId);
     if (entry) {
-        updateStatusBadge(entry.status);
+        const entryStatus = typeof entry.status === 'string' ? entry.status.toLowerCase() : 'idle';
+        updateStatusBadge(entryStatus);
         els.statusInfoText.textContent = `Просмотр запуска: ${runId}`;
         els.statusInfo.classList.add('active');
+        if (!TERMINAL_STATUSES.includes(entryStatus)) {
+            startDurationTimer(entry.startedAt);
+        } else if (entry.durationMs != null) {
+            els.durationTimer.hidden = false;
+            els.durationTimer.textContent = formatDuration(entry.durationMs);
+        }
     }
 
     renderHistory();
-    fetchStatus(true);
+    await fetchStatus(true);
+    if (
+        els.autoPoll.checked
+        && !TERMINAL_STATUSES.includes(els.statusBadge.dataset.status)
+    ) {
+        startPolling();
+    }
 
     toast({
         kind: 'info',
@@ -410,9 +492,10 @@ function clearHistoryRequest() {
 /**
  * Запускает таймер длительности (тикает раз в секунду).
  */
-function startDurationTimer() {
+function startDurationTimer(startedAt = Date.now()) {
     stopDurationTimer();
-    runStartTime = Date.now();
+    const parsedStart = startedAt == null ? NaN : new Date(startedAt).getTime();
+    runStartTime = Number.isNaN(parsedStart) ? Date.now() : parsedStart;
     els.durationTimer.hidden = false;
     els.durationTimer.textContent = '00:00';
 
@@ -426,6 +509,21 @@ function stopDurationTimer() {
         clearInterval(durationTimerId);
         durationTimerId = null;
     }
+}
+
+function getPipelineStage(data) {
+    return data?.stage
+        || data?.current_step
+        || data?.step
+        || data?.metadata?.stage
+        || data?.metadata?.current_step
+        || data?.metadata?.step
+        || null;
+}
+
+function setProgressValue(value) {
+    const progress = els.progressBar.parentElement;
+    progress?.setAttribute('aria-valuenow', String(Math.round(value)));
 }
 
 
@@ -450,16 +548,20 @@ function updateProgress(status, data) {
 
     if (lowerStatus === 'idle' || !status) {
         els.progressBar.style.width = '0%';
+        setProgressValue(0);
         return;
     }
 
     if (lowerStatus === 'queued') {
+        els.progressBar.style.width = '';
         els.progressBar.classList.add('indeterminate');
+        setProgressValue(0);
         return;
     }
 
     if (lowerStatus === 'succeeded') {
         els.progressBar.style.width = '100%';
+        setProgressValue(100);
         els.progressBar.classList.add('success');
         els.progressSteps.querySelectorAll('.step').forEach(s => s.classList.add('done'));
         return;
@@ -468,10 +570,11 @@ function updateProgress(status, data) {
     if (lowerStatus === 'failed') {
         // Бэр идёт до того места, где упало (если известно)
         els.progressBar.classList.add('failed');
-        const stage = (data && (data.stage || data.current_step || data.step)) || null;
+        const stage = getPipelineStage(data);
         const idx = STEP_ORDER.indexOf(stage);
         const pct = idx >= 0 ? ((idx + 1) / STEP_ORDER.length) * 100 : 50;
         els.progressBar.style.width = `${pct}%`;
+        setProgressValue(pct);
         if (idx >= 0) {
             STEP_ORDER.slice(0, idx).forEach(name => {
                 els.progressSteps.querySelector(`[data-step="${name}"]`)?.classList.add('done');
@@ -483,19 +586,22 @@ function updateProgress(status, data) {
 
     // running — пытаемся определить шаг
     if (lowerStatus === 'running') {
-        const stage = (data && (data.stage || data.current_step || data.step)) || null;
+        const stage = getPipelineStage(data);
         const idx = STEP_ORDER.indexOf(stage);
 
         if (idx >= 0) {
             const pct = ((idx + 0.5) / STEP_ORDER.length) * 100;
             els.progressBar.style.width = `${pct}%`;
+            setProgressValue(pct);
             STEP_ORDER.slice(0, idx).forEach(name => {
                 els.progressSteps.querySelector(`[data-step="${name}"]`)?.classList.add('done');
             });
             els.progressSteps.querySelector(`[data-step="${stage}"]`)?.classList.add('active');
         } else {
             // Нет точной информации о шаге — показываем неопределённую анимацию
+            els.progressBar.style.width = '';
             els.progressBar.classList.add('indeterminate');
+            setProgressValue(0);
         }
     }
 }
@@ -514,12 +620,14 @@ async function checkHealth() {
 
         // Считаем сервер живым, если ответ пришёл со статусом 200
         els.healthDot.dataset.status = 'ok';
+        els.healthDot.setAttribute('aria-label', 'API доступен');
         els.liveDot.dataset.status = 'ok';
         renderJSON(els.healthOutput, data);
 
         toast({ kind: 'success', title: 'API доступен', message: API_BASE_URL, timeout: 2000 });
     } catch (error) {
         els.healthDot.dataset.status = 'error';
+        els.healthDot.setAttribute('aria-label', 'API недоступен');
         els.liveDot.dataset.status = 'error';
 
         // Если сервер недоступен — fetch бросает TypeError
@@ -556,6 +664,9 @@ async function runPipeline() {
         skip_eval:      els.skipEval.checked,
     };
 
+    stopPolling();
+    stopDurationTimer();
+    els.durationTimer.hidden = true;
     setButtonLoading(els.runBtn, true);
 
     try {
@@ -597,8 +708,11 @@ async function runPipeline() {
             });
 
             // Сразу делаем первый запрос статуса и (если включено) запускаем поллинг
-            await fetchStatus();
-            if (els.autoPoll.checked) {
+            await fetchStatus(false);
+            if (
+                els.autoPoll.checked
+                && !TERMINAL_STATUSES.includes(els.statusBadge.dataset.status)
+            ) {
                 startPolling();
             }
 
@@ -636,7 +750,20 @@ async function copyRunIdToClipboard() {
         return;
     }
     try {
-        await navigator.clipboard.writeText(currentRunId);
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(currentRunId);
+        } else {
+            const input = document.createElement('textarea');
+            input.value = currentRunId;
+            input.setAttribute('readonly', '');
+            input.style.position = 'fixed';
+            input.style.opacity = '0';
+            document.body.appendChild(input);
+            input.select();
+            const copied = document.execCommand('copy');
+            input.remove();
+            if (!copied) throw new Error('Clipboard API недоступен');
+        }
         toast({ kind: 'success', title: 'run_id скопирован', message: currentRunId.slice(0, 24) + '…', timeout: 1800 });
     } catch (e) {
         toast({ kind: 'error', title: 'Не удалось скопировать', message: 'Возможно, нет доступа к clipboard' });
@@ -651,64 +778,95 @@ async function copyRunIdToClipboard() {
  */
 function updateStatusBadge(status) {
     const safeStatus = (status || 'idle').toLowerCase();
+    const labels = {
+        idle: 'Ожидание',
+        queued: 'В очереди',
+        running: 'Выполняется',
+        succeeded: 'Успешно',
+        failed: 'Ошибка',
+    };
     els.statusBadge.dataset.status = safeStatus;
-    els.statusBadge.textContent = safeStatus;
+    els.statusBadge.textContent = labels[safeStatus] || safeStatus;
 }
 
 /**
  * GET /pipeline/runs/{run_id} — получает свежий статус.
  * Если статус терминальный (succeeded/failed) — автоматически останавливает поллинг.
  */
-async function fetchStatus() {
+async function fetchStatus(manual = false) {
     if (!currentRunId) {
         renderJSON(els.statusOutput, {
             error: 'Нет активного run_id',
             hint: 'Запустите Pipeline в блоке выше',
         }, true);
-        return;
+        return null;
     }
+
+    const requestedRunId = currentRunId;
+    if (activeStatusRunId === requestedRunId) return null;
+    activeStatusRunId = requestedRunId;
 
     // Не показываем спиннер во время автополлинга, чтобы не моргала кнопка.
     // Спиннер ставим только если запрос инициирован вручную.
-    const isManual = !pollIntervalId || arguments[0] === true;
+    const isManual = manual;
     if (isManual) setButtonLoading(els.statusBtn, true);
 
     try {
-        const data = await apiRequest(`/pipeline/runs/${currentRunId}`, { method: 'GET' });
+        const data = await apiRequest(`/pipeline/runs/${requestedRunId}`, { method: 'GET' });
+        if (requestedRunId !== currentRunId) return data;
+        els.liveDot.dataset.status = 'ok';
 
         // Обновляем бейдж и вывод
         if (data && data.status) {
             const lowerStatus = data.status.toLowerCase();
             updateStatusBadge(data.status);
             updateProgress(data.status, data);
+            els.statusInfo.classList.add('active');
 
             // Обновляем запись истории на актуальный статус
             const entryPatch = { status: lowerStatus };
+            const entry = history.find(item => item.run_id === requestedRunId);
+            const wasTerminal = Boolean(entry && TERMINAL_STATUSES.includes(entry.status));
 
             // Если достигнут терминальный статус — глушим поллинг и таймер
             if (TERMINAL_STATUSES.includes(lowerStatus)) {
                 stopPolling();
                 stopDurationTimer();
 
-                const finishedAt = Date.now();
+                const apiStartedAt = data.started_at ? new Date(data.started_at).getTime() : NaN;
+                const apiFinishedAt = data.finished_at ? new Date(data.finished_at).getTime() : NaN;
+                const finishedAt = Number.isNaN(apiFinishedAt) ? Date.now() : apiFinishedAt;
+                const startedAt = Number.isNaN(apiStartedAt) ? runStartTime : apiStartedAt;
                 entryPatch.finishedAt = finishedAt;
-                entryPatch.durationMs = runStartTime ? finishedAt - runStartTime : null;
+                entryPatch.durationMs = entry?.durationMs
+                    ?? (startedAt ? Math.max(0, finishedAt - startedAt) : null);
 
                 els.statusInfoText.textContent =
-                    `Запуск ${currentRunId} завершён со статусом: ${data.status}`;
+                    `Запуск ${requestedRunId} завершён со статусом: ${data.status}`;
+                els.durationTimer.hidden = entryPatch.durationMs == null;
+                els.durationTimer.textContent = formatDuration(entryPatch.durationMs);
 
-                toast({
-                    kind: lowerStatus === 'succeeded' ? 'success' : 'error',
-                    title: lowerStatus === 'succeeded' ? 'Pipeline завершён успешно' : 'Pipeline упал',
-                    message: `Длительность: ${formatDuration(entryPatch.durationMs)}`,
-                });
+                if (!wasTerminal) {
+                    toast({
+                        kind: lowerStatus === 'succeeded' ? 'success' : 'error',
+                        title: lowerStatus === 'succeeded' ? 'Pipeline завершён успешно' : 'Pipeline упал',
+                        message: `Длительность: ${formatDuration(entryPatch.durationMs)}`,
+                    });
+                }
+            } else {
+                els.statusInfoText.textContent = `Отслеживается запуск: ${requestedRunId}`;
+                if (!durationTimerId) {
+                    startDurationTimer(data.started_at || entry?.startedAt || Date.now());
+                }
             }
 
-            updateHistoryEntry(currentRunId, entryPatch);
+            updateHistoryEntry(requestedRunId, entryPatch);
         }
 
         renderJSON(els.statusOutput, data);
+        return data;
     } catch (error) {
+        if (requestedRunId !== currentRunId) return null;
         const errorPayload = error.body || {
             error: error.message,
             hint: 'Не удалось получить статус. Проверьте доступность ' + API_BASE_URL,
@@ -721,8 +879,10 @@ async function fetchStatus() {
             stopPolling();
             els.liveDot.dataset.status = 'error';
         }
+        return null;
     } finally {
         if (isManual) setButtonLoading(els.statusBtn, false);
+        if (activeStatusRunId === requestedRunId) activeStatusRunId = null;
     }
 }
 
@@ -733,8 +893,9 @@ function startPolling() {
     // Защита от двойного запуска — гарантируем единственный активный интервал
     if (pollIntervalId) return;
     if (!currentRunId) return;
+    if (TERMINAL_STATUSES.includes(els.statusBadge.dataset.status)) return;
 
-    pollIntervalId = setInterval(fetchStatus, POLL_INTERVAL_MS);
+    pollIntervalId = setInterval(() => fetchStatus(false), POLL_INTERVAL_MS);
     console.log(`[polling] started for run_id=${currentRunId}`);
 }
 
@@ -774,8 +935,46 @@ const PRESETS = {
     'full':       { execute: true,  skip_load: false, skip_features: false, skip_train: false, skip_eval: false },
     'train-only': { execute: true,  skip_load: true,  skip_features: true,  skip_train: false, skip_eval: true  },
     'dry-run':    { execute: false, skip_load: false, skip_features: false, skip_train: false, skip_eval: false },
-    'reset':      { execute: false, skip_load: false, skip_features: false, skip_train: false, skip_eval: false },
+    'reset':      { execute: true,  skip_load: false, skip_features: false, skip_train: false, skip_eval: false },
 };
+
+function getPipelineOptions() {
+    return {
+        execute: els.execute.checked,
+        skip_load: els.skipLoad.checked,
+        skip_features: els.skipFeatures.checked,
+        skip_train: els.skipTrain.checked,
+        skip_eval: els.skipEval.checked,
+    };
+}
+
+function updatePlanSummary() {
+    const options = getPipelineOptions();
+    const skipped = [
+        options.skip_load,
+        options.skip_features,
+        options.skip_train,
+        options.skip_eval,
+    ].filter(Boolean).length;
+    const activeStages = 4 - skipped;
+    const stageWord = activeStages === 1
+        ? 'этап'
+        : activeStages >= 2 && activeStages <= 4
+            ? 'этапа'
+            : 'этапов';
+    const mode = options.execute ? 'реальный запуск' : 'dry-run';
+    els.planValue.textContent = `${activeStages} ${stageWord} · ${mode}`;
+
+    const comparablePresets = Object.entries(PRESETS).filter(([name]) => name !== 'reset');
+    const activePreset = comparablePresets.find(([, preset]) =>
+        Object.keys(options).every(key => options[key] === preset[key])
+    )?.[0];
+
+    document.querySelectorAll('.preset-btn').forEach(button => {
+        button.classList.toggle('active', button.dataset.preset === activePreset);
+        button.setAttribute('aria-pressed', String(button.dataset.preset === activePreset));
+    });
+}
 
 function applyPreset(name) {
     const preset = PRESETS[name];
@@ -785,6 +984,7 @@ function applyPreset(name) {
     els.skipFeatures.checked = preset.skip_features;
     els.skipTrain.checked    = preset.skip_train;
     els.skipEval.checked     = preset.skip_eval;
+    updatePlanSummary();
 
     toast({ kind: 'info', title: 'Пресет применён', message: name, timeout: 1500 });
 }
@@ -869,8 +1069,10 @@ async function silentHealthPing() {
     try {
         await apiRequest('/health', { method: 'GET' });
         els.liveDot.dataset.status = 'ok';
+        document.getElementById('apiInfo').setAttribute('aria-label', `API доступен: ${API_BASE_URL}`);
     } catch {
         els.liveDot.dataset.status = 'error';
+        document.getElementById('apiInfo').setAttribute('aria-label', `API недоступен: ${API_BASE_URL}`);
     }
 }
 
@@ -898,6 +1100,10 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
     btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
 });
 
+[els.execute, els.skipLoad, els.skipFeatures, els.skipTrain, els.skipEval].forEach(input => {
+    input.addEventListener('change', updatePlanSummary);
+});
+
 // На случай закрытия вкладки — корректно останавливаем интервал
 window.addEventListener('beforeunload', () => {
     stopPolling();
@@ -905,7 +1111,11 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Показываем реальный адрес бэкенда в заголовке
-document.getElementById('apiUrl').textContent = API_BASE_URL;
+document.getElementById('apiUrl').textContent = API_BASE_URL.replace(/^https?:\/\//, '');
+document.getElementById('apiInfo').title = API_BASE_URL;
+
+syncThemeUI();
+updatePlanSummary();
 
 // Восстанавливаем историю и отрисовываем
 loadHistory();
