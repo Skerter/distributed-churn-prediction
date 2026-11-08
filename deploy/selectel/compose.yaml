@@ -1,3 +1,5 @@
+name: dcp
+
 # ════════════════════════════════════════════════════════════════════════════
 # DCP Live Demo on Selectel VDS behind a shared Traefik.
 #
@@ -40,7 +42,7 @@ services:
       - "traefik.docker.network=proxy"
       - "traefik.http.routers.dcp-api.rule=Host(`${API_DOMAIN}`)"
       - "traefik.http.routers.dcp-api.entrypoints=websecure"
-      - "traefik.http.routers.dcp-api.tls.certresolver=le"
+      - "traefik.http.routers.dcp-api.tls.certresolver=letsencrypt"
       - "traefik.http.services.dcp-api.loadbalancer.server.port=8000"
 
   # ── Frontend ──────────────────────────────────────────────────────────────────
@@ -62,7 +64,7 @@ services:
       - "traefik.docker.network=proxy"
       - "traefik.http.routers.dcp-front.rule=Host(`${SITE_DOMAIN}`)"
       - "traefik.http.routers.dcp-front.entrypoints=websecure"
-      - "traefik.http.routers.dcp-front.tls.certresolver=le"
+      - "traefik.http.routers.dcp-front.tls.certresolver=letsencrypt"
       - "traefik.http.services.dcp-front.loadbalancer.server.port=80"
 
   # ── Telegram-bot ───────────────────────────────────────────────────────────
@@ -114,18 +116,25 @@ services:
       - proxy
       - dcp_internal
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
       - "traefik.http.routers.dcp-mlflow.rule=Host(`${MLFLOW_DOMAIN}`)"
       - "traefik.http.routers.dcp-mlflow.entrypoints=websecure"
-      - "traefik.http.routers.dcp-mlflow.tls.certresolver=le"
+      - "traefik.http.routers.dcp-mlflow.tls.certresolver=letsencrypt"
       - "traefik.http.services.dcp-mlflow.loadbalancer.server.port=5000"
 
   # ── Postgres (backend-store for MLflow) ────────────────────────────────────
   db:
     image: postgres:16-alpine
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
